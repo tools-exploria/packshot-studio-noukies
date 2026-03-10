@@ -1,66 +1,111 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+
+const MODES = [
+  {
+    title: "Motif / Pattern",
+    description: "Appliquez un motif textile sur votre produit. Upload du packshot + pattern, tiling automatique, génération IA, détourage intelligent.",
+    href: "/pattern",
+    icon: "🎨",
+    badge: "5 étapes",
+    accent: "border-l-[#b8956a]",
+    iconBg: "bg-[#b8956a]/10",
+  },
+  {
+    title: "Couleur / Texture",
+    description: "Changez la couleur ou la texture du tissu. Color picker avec presets, upload de texture (velours, jersey, corduroy...).",
+    href: "/couleur",
+    icon: "🖌️",
+    badge: "5 étapes",
+    accent: "border-l-[#2d4a9e]",
+    iconBg: "bg-[#2d4a9e]/10",
+  },
+  {
+    title: "Photo d'ambiance",
+    description: "Mettez votre produit en situation de vie : bébé, nursery, parent, lifestyle. Templates prédéfinis ou scène personnalisée.",
+    href: "/ambiance",
+    icon: "📸",
+    badge: "4 étapes",
+    accent: "border-l-[#a5d6a7]",
+    iconBg: "bg-[#a5d6a7]/20",
+  },
+  {
+    title: "3D Produit",
+    description: "Générez une visualisation 3D haute-fidélité d'un produit à partir de sa fiche technique et d'un échantillon de tissu.",
+    href: "/3d-produit",
+    icon: "🧸",
+    badge: "Demo",
+    accent: "border-l-[#ce93d8]",
+    iconBg: "bg-[#ce93d8]/20",
+  },
+];
 
 export default function Home() {
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className={styles.intro}>
-          <h1>To get started, edit the page.js file.</h1>
-          <p>
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="max-w-5xl mx-auto px-6 py-20">
+      {/* Hero */}
+      <div className="text-center mb-16 space-y-4">
+        <div className="inline-flex items-center gap-2 bg-secondary/80 text-secondary-foreground px-4 py-1.5 rounded-full text-sm font-medium mb-2">
+          <span className="w-2 h-2 rounded-full bg-[#a5d6a7] animate-pulse" />
+          Plateforme IA
         </div>
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
+        <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-foreground">
+          Packshot Studio
+        </h1>
+        <p className="text-lg text-muted-foreground max-w-xl mx-auto leading-relaxed">
+          Générez des packshots e-commerce professionnels avec l&apos;intelligence artificielle.
+          Choisissez un mode pour commencer.
+        </p>
+      </div>
+
+      {/* Mode cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {MODES.map((mode) => (
+          <a key={mode.href} href={mode.href} className="group">
+            <Card className={`h-full noukies-card-hover border-l-4 ${mode.accent} bg-card shadow-sm`}>
+              <CardHeader className="pb-3">
+                <div className="flex items-start justify-between mb-3">
+                  <div className={`w-12 h-12 rounded-xl ${mode.iconBg} flex items-center justify-center text-2xl`}>
+                    {mode.icon}
+                  </div>
+                  <Badge variant="secondary" className="text-xs font-normal">
+                    {mode.badge}
+                  </Badge>
+                </div>
+                <CardTitle className="text-lg group-hover:text-primary transition-colors duration-200">
+                  {mode.title}
+                </CardTitle>
+                <CardDescription className="text-sm leading-relaxed">
+                  {mode.description}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <span className="inline-flex items-center gap-1.5 text-sm font-medium text-primary opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                  Commencer
+                  <svg className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
+                </span>
+              </CardContent>
+            </Card>
           </a>
-          <a
-            className={styles.secondary}
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+        ))}
+      </div>
+
+      {/* Subtle features row */}
+      <div className="mt-16 grid grid-cols-1 sm:grid-cols-3 gap-6 text-center">
+        {[
+          { icon: "⚡", label: "Génération rapide", sub: "Gemini Flash & Pro" },
+          { icon: "📐", label: "Multi-résolution", sub: "1K, 2K, 4K" },
+          { icon: "📦", label: "Export flexible", sub: "PNG, PDF, détourage" },
+        ].map((f) => (
+          <div key={f.label} className="flex flex-col items-center gap-1.5 py-4">
+            <span className="text-2xl">{f.icon}</span>
+            <p className="text-sm font-medium text-foreground">{f.label}</p>
+            <p className="text-xs text-muted-foreground">{f.sub}</p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
