@@ -4,58 +4,51 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Stepper, UploadZone } from "@/components/shared";
 import { PROMPTS } from "@/lib/prompts";
-import { fileToBase64, downloadImage, generateImages, MODELS } from "@/lib/api";
+import { downloadImage, MODELS } from "@/lib/api";
 import { useExportPipeline } from "@/hooks/useExportPipeline";
 import { ExportPanel } from "@/components/ExportPanel";
 import { GalleryLightbox, SimpleLightbox } from "@/components/Lightbox";
+import { useGenerationPage } from "@/hooks/useGenerationPage";
 
 const STEPS = ["Produit", "Pattern", "Tiling", "Génération", "Export"];
 
-
-
 export default function PatternPage() {
     const [step, setStep] = useState(0);
-    const [productFile, setProductFile] = useState(null);
-    const [productPreview, setProductPreview] = useState(null);
-    const [productDims, setProductDims] = useState(null);
+
+    const {
+        loading, setLoading,
+        error, setError,
+        generatedImages,
+        imageDims,
+        selectedImages,
+        variantCount, setVariantCount,
+        resolution, setResolution,
+        aspectRatio, setAspectRatio,
+        productNotes, setProductNotes,
+        productFile,
+        productPreview,
+        productDims,
+        lightboxIdx, setLightboxIdx,
+        editingIdx, setEditingIdx,
+        editPrompt, setEditPrompt,
+        editLoading,
+        filledCount,
+        handleProductFile,
+        runGenerate,
+        handleEditImage,
+        toggleSelect,
+        toggleSelectAll,
+    } = useGenerationPage();
+
+    // ── Pattern-specific state ───────────────────────────────────
     const [patternFile, setPatternFile] = useState(null);
     const [patternPreview, setPatternPreview] = useState(null);
     const [density, setDensity] = useState(4);
     const [tiledPreview, setTiledPreview] = useState(null);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState(null);
-    const [generatedImages, setGeneratedImages] = useState([]);
-    const [selectedImages, setSelectedImages] = useState(new Set());
-    const [imageDims, setImageDims] = useState([]);
-    const [variantCount, setVariantCount] = useState(4);
-    const [resolution, setResolution] = useState("2K");
-    const [aspectRatio, setAspectRatio] = useState("1:1");
-    // Lightbox
-    const [lightboxIdx, setLightboxIdx] = useState(null);
-    // Product notes (injected into prompt)
-    const [productNotes, setProductNotes] = useState("");
-    // Per-image edit
-    const [editingIdx, setEditingIdx] = useState(null);
-    const [editPrompt, setEditPrompt] = useState("");
-    const [editLoading, setEditLoading] = useState(false);
 
-    // Shared export pipeline (bg mode, chroma key, file naming, export)
     const pipeline = useExportPipeline({
         generatedImages, imageDims, resolution, aspectRatio, selectedImages, setLoading, setError,
     });
-
-    const handleProductFile = useCallback((f) => {
-        setProductFile(f);
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            setProductPreview(e.target.result);
-            // Measure product image dimensions
-            const img = new Image();
-            img.onload = () => setProductDims({ w: img.naturalWidth, h: img.naturalHeight });
-            img.src = e.target.result;
-        };
-        reader.readAsDataURL(f);
-    }, []);
 
     const handlePatternFile = useCallback((f) => {
         setPatternFile(f);
@@ -64,7 +57,7 @@ export default function PatternPage() {
         reader.readAsDataURL(f);
     }, []);
 
-    // Step 3: Tile the pattern on a canvas matching product image dimensions
+    // Tile the pattern on a canvas matching product image dimensions
     const handleTile = async () => {
         if (!patternFile || !productDims) return;
         setLoading(true);
@@ -86,133 +79,22 @@ export default function PatternPage() {
         }
     };
 
-    // Step 4: Generate packshot — fires N parallel requests, progressive loading
+    // Generate: convert tiled object URL → base64, assemble prompt, then run
     const handleGenerate = async (model = MODELS.FLASH) => {
         if (!productFile || !tiledPreview) return;
-        setLoading(true);
-        setError(null);
-        setGeneratedImages(Array(variantCount).fill(null));
-        setSelectedImages(new Set());
-        setImageDims(Array(variantCount).fill(null));
-        try {
-            const productB64 = await fileToBase64(productFile);
-            const tiledRes = await fetch(tiledPreview);
-            const tiledBlob = await tiledRes.blob();
-            const tiledB64 = await new Promise((resolve) => {
-                const r = new FileReader();
-                r.onload = () => resolve(r.result.split(",")[1]);
-                r.readAsDataURL(tiledBlob);
-            });
 
-            // Inject product notes into prompt
-            const prompt = PROMPTS.applyPattern.replace(
-                "{PRODUCT_NOTES}",
-                productNotes.trim() ? `\nPRODUCT-SPECIFIC NOTES:\n${productNotes.trim()}` : ""
-            );
+        // Convert tiledPreview (object URL) to a File-compatible blob
+        const tiledRes = await fetch(tiledPreview);
+        const tiledBlob = await tiledRes.blob();
+        const tiledFile = new File([tiledBlob], "tiled.png", { type: "image/png" });
 
-            const results = await generateImages({
-                prompt,
-                images: [productB64, tiledB64],
-                count: variantCount,
-                model,
-                resolution,
-                aspectRatio,
-                onProgress: (i, image) => {
-                    setGeneratedImages((prev) => {
-                        const next = [...prev];
-                        next[i] = image;
-                        return next;
-                    });
-                    // Measure image dimensions
-                    const img = new Image();
-                    img.onload = () => {
-                        setImageDims((prev) => {
-                            const next = [...prev];
-                            next[i] = { w: img.naturalWidth, h: img.naturalHeight };
-                            return next;
-                        });
-                    };
-                    img.src = `data:image/png;base64,${image}`;
-                },
-            });
+        const prompt = PROMPTS.applyPattern.replace(
+            "{PRODUCT_NOTES}",
+            productNotes.trim() ? `\nPRODUCT-SPECIFIC NOTES:\n${productNotes.trim()}` : ""
+        );
 
-            if (!results.length) setError("Aucune image générée");
-            setGeneratedImages(results.length ? results : []);
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setLoading(false);
-        }
+        await runGenerate(prompt, [productFile, tiledFile], model);
     };
-    // Per-image edit: send image + instruction to get a modified variant
-    const handleEditImage = async (idx, model = MODELS.PRO) => {
-        if (!editPrompt.trim() || !generatedImages[idx]) return;
-        setEditLoading(true);
-        setError(null);
-        try {
-            const requestBody = JSON.stringify({
-                prompt: editPrompt.trim(),
-                images: [generatedImages[idx]],
-                model,
-            });
-            const controller = new AbortController();
-            const timer = setTimeout(() => controller.abort(), 120_000);
-            const res = await fetch("/api/generate", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: requestBody,
-                signal: controller.signal,
-            });
-            clearTimeout(timer);
-            const data = await res.json();
-            if (data.status === "success" && data.image) {
-                // Append edited image as new variant
-                setGeneratedImages((prev) => [...prev, data.image]);
-                // Measure dims
-                const img = new Image();
-                img.onload = () => {
-                    setImageDims((prev) => [...prev, { w: img.naturalWidth, h: img.naturalHeight }]);
-                };
-                img.src = `data:image/png;base64,${data.image}`;
-                setEditingIdx(null);
-                setEditPrompt("");
-            } else {
-                const errMsg = data.error || "Pas d'image retournée par l'API";
-                console.error("[edit] Échec:", errMsg);
-                setError(`Modification échouée: ${errMsg}`);
-            }
-        } catch (err) {
-            const errMsg = err.name === "AbortError" ? "Timeout (120s)" : err.message;
-            console.error("[edit] Erreur:", errMsg);
-            setError(`Modification échouée: ${errMsg}`);
-        } finally {
-            setEditLoading(false);
-        }
-    };
-
-    // Toggle image selection
-    const toggleSelect = (idx) => {
-        setSelectedImages((prev) => {
-            const next = new Set(prev);
-            if (next.has(idx)) next.delete(idx);
-            else next.add(idx);
-            return next;
-        });
-    };
-
-    // Select / deselect all
-    const toggleSelectAll = () => {
-        const filled = generatedImages.filter(Boolean);
-        if (selectedImages.size === filled.length) {
-            setSelectedImages(new Set());
-        } else {
-            setSelectedImages(new Set(generatedImages.map((img, i) => (img ? i : -1)).filter((i) => i >= 0)));
-        }
-    };
-
-
-
-    const filledCount = generatedImages.filter(Boolean).length;
 
     return (
         <div className="max-w-4xl mx-auto px-6 py-8">
@@ -222,7 +104,7 @@ export default function PatternPage() {
                 <div className="bg-destructive/10 text-destructive rounded-lg p-4 mb-6 text-sm">{error}</div>
             )}
 
-            {/* Step 1: Product upload */}
+            {/* Step 0: Product upload */}
             {step === 0 && (
                 <Card>
                     <CardHeader><CardTitle>Photo produit de référence</CardTitle></CardHeader>
@@ -240,7 +122,7 @@ export default function PatternPage() {
                 </Card>
             )}
 
-            {/* Step 2: Pattern upload */}
+            {/* Step 1: Pattern upload */}
             {step === 1 && (
                 <Card>
                     <CardHeader><CardTitle>Fichier pattern (motif unitaire)</CardTitle></CardHeader>
@@ -261,7 +143,7 @@ export default function PatternPage() {
                 </Card>
             )}
 
-            {/* Step 3: Tiling */}
+            {/* Step 2: Tiling */}
             {step === 2 && (
                 <Card>
                     <CardHeader>
@@ -273,17 +155,11 @@ export default function PatternPage() {
                         </p>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        {/* Density slider */}
                         <div className="flex items-center gap-4">
                             <label className="text-sm font-medium min-w-fit">Densité</label>
-                            <input
-                                type="range"
-                                min={1}
-                                max={12}
-                                value={density}
+                            <input type="range" min={1} max={12} value={density}
                                 onChange={(e) => setDensity(Number(e.target.value))}
-                                className="flex-1 accent-primary"
-                            />
+                                className="flex-1 accent-primary" />
                             <span className="text-lg font-bold min-w-[3ch] text-center">×{density}</span>
                         </div>
                         <p className="text-xs text-muted-foreground">
@@ -305,7 +181,7 @@ export default function PatternPage() {
                 </Card>
             )}
 
-            {/* Step 4: Generation */}
+            {/* Step 3: Generation */}
             {step === 3 && (
                 <Card>
                     <CardHeader>
@@ -331,25 +207,17 @@ export default function PatternPage() {
                             <div className="space-y-4">
                                 <div className="flex items-center gap-4">
                                     <label className="text-sm font-medium min-w-fit">Variantes</label>
-                                    <input
-                                        type="range"
-                                        min={1}
-                                        max={10}
-                                        value={variantCount}
+                                    <input type="range" min={1} max={10} value={variantCount}
                                         onChange={(e) => setVariantCount(Number(e.target.value))}
-                                        className="flex-1 accent-primary"
-                                    />
+                                        className="flex-1 accent-primary" />
                                     <span className="text-lg font-bold min-w-[2ch] text-center">{variantCount}</span>
                                 </div>
                                 <div className="flex items-center gap-4">
                                     <label className="text-sm font-medium min-w-fit">Résolution</label>
                                     <div className="flex gap-2 flex-1">
                                         {["1K", "2K", "4K"].map((r) => (
-                                            <button
-                                                key={r}
-                                                onClick={() => setResolution(r)}
-                                                className={`flex-1 py-1.5 px-3 rounded-md text-sm font-medium border transition-all ${resolution === r ? "bg-primary text-primary-foreground border-primary" : "hover:bg-accent border-input"}`}
-                                            >
+                                            <button key={r} onClick={() => setResolution(r)}
+                                                className={`flex-1 py-1.5 px-3 rounded-md text-sm font-medium border transition-all ${resolution === r ? "bg-primary text-primary-foreground border-primary" : "hover:bg-accent border-input"}`}>
                                                 {r}
                                             </button>
                                         ))}
@@ -359,26 +227,19 @@ export default function PatternPage() {
                                     <label className="text-sm font-medium min-w-fit">Ratio</label>
                                     <div className="flex gap-2 flex-1 flex-wrap">
                                         {["1:1", "4:3", "3:4", "16:9", "9:16"].map((r) => (
-                                            <button
-                                                key={r}
-                                                onClick={() => setAspectRatio(r)}
-                                                className={`py-1.5 px-3 rounded-md text-sm font-medium border transition-all ${aspectRatio === r ? "bg-primary text-primary-foreground border-primary" : "hover:bg-accent border-input"}`}
-                                            >
+                                            <button key={r} onClick={() => setAspectRatio(r)}
+                                                className={`py-1.5 px-3 rounded-md text-sm font-medium border transition-all ${aspectRatio === r ? "bg-primary text-primary-foreground border-primary" : "hover:bg-accent border-input"}`}>
                                                 {r}
                                             </button>
                                         ))}
                                     </div>
                                 </div>
-                                {/* Product-specific notes */}
                                 <div className="space-y-1">
                                     <label className="text-sm font-medium">Notes produit (optionnel)</label>
-                                    <textarea
-                                        value={productNotes}
-                                        onChange={(e) => setProductNotes(e.target.value)}
+                                    <textarea value={productNotes} onChange={(e) => setProductNotes(e.target.value)}
                                         placeholder="Ex: Le produit a des bretelles en tissu qui doivent aussi recevoir le motif. Les parties en plastique sont transparentes."
                                         className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[60px] resize-y"
-                                        rows={2}
-                                    />
+                                        rows={2} />
                                     <p className="text-[11px] text-muted-foreground">Ajoutez des précisions spécifiques au produit pour améliorer le résultat.</p>
                                 </div>
                                 <Button onClick={() => handleGenerate(MODELS.FLASH)} className="w-full">
@@ -388,7 +249,7 @@ export default function PatternPage() {
                             </div>
                         )}
 
-                        {/* Image grid — with multi-select checkboxes, download buttons, click to enlarge */}
+                        {/* Image grid */}
                         {(generatedImages.length > 0 || loading) && (
                             <div className="space-y-3">
                                 {filledCount > 0 && (
@@ -401,79 +262,41 @@ export default function PatternPage() {
                                 )}
                                 <div className="grid grid-cols-2 gap-4">
                                     {generatedImages.map((img, i) => (
-                                        <div
-                                            key={i}
-                                            className={`relative rounded-lg border overflow-hidden transition-all ${img ? "cursor-pointer hover:shadow-lg" : "animate-pulse"
-                                                } ${img && selectedImages.has(i) ? "ring-2 ring-primary ring-offset-2" : ""}`}
-                                        >
+                                        <div key={i}
+                                            className={`relative rounded-lg border overflow-hidden transition-all ${img ? "cursor-pointer hover:shadow-lg" : "animate-pulse"} ${img && selectedImages.has(i) ? "ring-2 ring-primary ring-offset-2" : ""}`}>
                                             {img ? (
                                                 <>
-                                                    {/* Click image to open lightbox */}
-                                                    <img
-                                                        src={`data:image/png;base64,${img}`}
-                                                        alt={`Variante ${i + 1}`}
+                                                    <img src={`data:image/png;base64,${img}`} alt={`Variante ${i + 1}`}
                                                         className="w-full aspect-square object-contain bg-white"
-                                                        onClick={() => setLightboxIdx(i)}
-                                                    />
-                                                    {/* Checkbox for selection */}
-                                                    <button
-                                                        onClick={(e) => { e.stopPropagation(); toggleSelect(i); }}
-                                                        className={`absolute top-2 left-2 w-6 h-6 rounded border-2 flex items-center justify-center text-xs font-bold transition-all ${selectedImages.has(i)
-                                                            ? "bg-primary border-primary text-primary-foreground"
-                                                            : "bg-white/80 border-gray-300 hover:border-primary"
-                                                            }`}
-                                                    >
+                                                        onClick={() => setLightboxIdx(i)} />
+                                                    <button onClick={(e) => { e.stopPropagation(); toggleSelect(i); }}
+                                                        className={`absolute top-2 left-2 w-6 h-6 rounded border-2 flex items-center justify-center text-xs font-bold transition-all ${selectedImages.has(i) ? "bg-primary border-primary text-primary-foreground" : "bg-white/80 border-gray-300 hover:border-primary"}`}>
                                                         {selectedImages.has(i) && "✓"}
                                                     </button>
-                                                    {/* Download button */}
-                                                    <button
-                                                        onClick={(e) => { e.stopPropagation(); downloadImage(img, pipeline.getFileName(i)); }}
+                                                    <button onClick={(e) => { e.stopPropagation(); downloadImage(img, pipeline.getFileName(i)); }}
                                                         className="absolute top-2 right-2 w-8 h-8 rounded-full bg-white/80 hover:bg-white flex items-center justify-center text-sm shadow transition-all hover:scale-110"
-                                                        title="Télécharger"
-                                                    >
-                                                        ⬇
-                                                    </button>
-                                                    {/* Label + edit button */}
+                                                        title="Télécharger">⬇</button>
                                                     <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/40 to-transparent p-3 flex items-center justify-between">
                                                         <span className="text-white text-sm font-medium">Variante {i + 1}</span>
-                                                        <button
-                                                            onClick={(e) => { e.stopPropagation(); setEditingIdx(editingIdx === i ? null : i); setEditPrompt(""); }}
+                                                        <button onClick={(e) => { e.stopPropagation(); setEditingIdx(editingIdx === i ? null : i); setEditPrompt(""); }}
                                                             className="text-white/80 hover:text-white text-xs bg-white/20 hover:bg-white/30 rounded px-2 py-0.5 transition-all"
-                                                            title="Modifier cette image"
-                                                        >
-                                                            ✏️ Modifier
-                                                        </button>
+                                                            title="Modifier cette image">✏️ Modifier</button>
                                                     </div>
-                                                    {/* Inline edit input */}
                                                     {editingIdx === i && (
                                                         <div className="absolute left-0 right-0 bottom-10 p-2 bg-background border-t" onClick={(e) => e.stopPropagation()}>
                                                             <div className="flex gap-1">
-                                                                <input
-                                                                    type="text"
-                                                                    value={editPrompt}
+                                                                <input type="text" value={editPrompt}
                                                                     onChange={(e) => setEditPrompt(e.target.value)}
                                                                     onKeyDown={(e) => { if (e.key === "Enter" && editPrompt.trim()) handleEditImage(i); }}
                                                                     placeholder="Décrivez la modification…"
                                                                     className="flex-1 rounded-md border border-input bg-background px-2 py-1 text-xs"
-                                                                    autoFocus
-                                                                />
-                                                                <Button
-                                                                    size="sm"
-                                                                    variant="outline"
-                                                                    disabled={editLoading || !editPrompt.trim()}
-                                                                    onClick={() => handleEditImage(i, MODELS.FLASH)}
-                                                                    className="text-xs h-7"
-                                                                    title="Rapide (Flash)"
-                                                                >
+                                                                    autoFocus />
+                                                                <Button size="sm" variant="outline" disabled={editLoading || !editPrompt.trim()}
+                                                                    onClick={() => handleEditImage(i, MODELS.FLASH)} className="text-xs h-7" title="Rapide (Flash)">
                                                                     {editLoading ? "…" : "⚡"}
                                                                 </Button>
-                                                                <Button
-                                                                    size="sm"
-                                                                    disabled={editLoading || !editPrompt.trim()}
-                                                                    onClick={() => handleEditImage(i, MODELS.PRO)}
-                                                                    className="text-xs h-7"
-                                                                    title="Qualité (Pro)"
-                                                                >
+                                                                <Button size="sm" disabled={editLoading || !editPrompt.trim()}
+                                                                    onClick={() => handleEditImage(i, MODELS.PRO)} className="text-xs h-7" title="Qualité (Pro)">
                                                                     {editLoading ? "…" : "Pro"}
                                                                 </Button>
                                                             </div>
@@ -497,25 +320,18 @@ export default function PatternPage() {
                             </div>
                         )}
 
-                        {/* Actions — only after images exist */}
                         {filledCount > 0 && !loading && (
                             <div className="flex gap-2">
-                                <Button variant="outline" onClick={() => handleGenerate(MODELS.FLASH)}>
-                                    ⚡ Régénérer (Flash)
-                                </Button>
-                                <Button variant="outline" onClick={() => handleGenerate(MODELS.PRO)}>
-                                    🔄 Régénérer (Pro)
-                                </Button>
-                                <Button onClick={() => setStep(4)} className="flex-1">
-                                    Export →
-                                </Button>
+                                <Button variant="outline" onClick={() => handleGenerate(MODELS.FLASH)}>⚡ Régénérer (Flash)</Button>
+                                <Button variant="outline" onClick={() => handleGenerate(MODELS.PRO)}>🔄 Régénérer (Pro)</Button>
+                                <Button onClick={() => setStep(4)} className="flex-1">Export →</Button>
                             </div>
                         )}
                     </CardContent>
                 </Card>
             )}
 
-            {/* Step 5: Export */}
+            {/* Step 4: Export */}
             {step === 4 && (
                 <Card>
                     <CardHeader>
@@ -527,32 +343,18 @@ export default function PatternPage() {
                         </p>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        {/* All generated images with selection + dimensions */}
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                             {generatedImages.map((img, idx) => img && (
-                                <div
-                                    key={idx}
-                                    onClick={() => toggleSelect(idx)}
-                                    className={`relative text-center cursor-pointer rounded-lg border-2 overflow-hidden transition-all hover:shadow-lg ${selectedImages.has(idx) ? "border-primary ring-2 ring-primary ring-offset-2" : "border-transparent"
-                                        }`}
-                                >
-                                    <img
-                                        src={`data:image/png;base64,${img}`}
-                                        alt={`Variante ${idx + 1}`}
-                                        className="w-full aspect-square object-contain bg-white"
-                                    />
-                                    {/* Selection badge */}
-                                    <div className={`absolute top-2 left-2 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shadow transition-all ${selectedImages.has(idx) ? "bg-primary text-primary-foreground" : "bg-white/80 text-muted-foreground"
-                                        }`}>
+                                <div key={idx} onClick={() => toggleSelect(idx)}
+                                    className={`relative text-center cursor-pointer rounded-lg border-2 overflow-hidden transition-all hover:shadow-lg ${selectedImages.has(idx) ? "border-primary ring-2 ring-primary ring-offset-2" : "border-transparent"}`}>
+                                    <img src={`data:image/png;base64,${img}`} alt={`Variante ${idx + 1}`}
+                                        className="w-full aspect-square object-contain bg-white" />
+                                    <div className={`absolute top-2 left-2 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shadow transition-all ${selectedImages.has(idx) ? "bg-primary text-primary-foreground" : "bg-white/80 text-muted-foreground"}`}>
                                         {selectedImages.has(idx) ? "✓" : idx + 1}
                                     </div>
-                                    {/* Lightbox button */}
-                                    <button
-                                        onClick={(e) => { e.stopPropagation(); setLightboxIdx(idx); }}
+                                    <button onClick={(e) => { e.stopPropagation(); setLightboxIdx(idx); }}
                                         className="absolute top-2 right-2 w-6 h-6 rounded-full bg-white/80 hover:bg-white flex items-center justify-center text-xs shadow"
-                                        title="Agrandir"
-                                    >🔍</button>
-                                    {/* Dimensions + label */}
+                                        title="Agrandir">🔍</button>
                                     <div className="bg-muted/80 py-1 px-2">
                                         <p className="text-xs font-medium">Variante {idx + 1}</p>
                                         <p className="text-[10px] text-muted-foreground">
@@ -563,7 +365,6 @@ export default function PatternPage() {
                             ))}
                         </div>
 
-                        {/* Select all / none shortcut */}
                         <div className="flex justify-between items-center">
                             <button onClick={toggleSelectAll} className="text-sm text-primary hover:underline">
                                 {selectedImages.size === filledCount ? "Tout désélectionner" : "Tout sélectionner"}

@@ -1,5 +1,6 @@
 import { Outfit } from "next/font/google";
 import "./globals.css";
+import { NavLinks } from "@/components/NavLinks";
 
 const outfit = Outfit({ subsets: ["latin"], weight: ["300", "400", "500", "600", "700"] });
 
@@ -8,11 +9,6 @@ export const metadata = {
   description: "Plateforme IA de génération de packshots produit pour Noukies",
 };
 
-const NAV_LINKS = [
-  { href: "/pattern", label: "Motif", icon: "🎨" },
-  { href: "/couleur", label: "Couleur", icon: "🖌️" },
-  { href: "/ambiance", label: "Ambiance", icon: "📸" },
-];
 
 export default function RootLayout({ children }) {
   return (
@@ -36,19 +32,8 @@ export default function RootLayout({ children }) {
                 </span>
               </a>
 
-              {/* Navigation */}
-              <nav className="flex items-center gap-1">
-                {NAV_LINKS.map((link) => (
-                  <a
-                    key={link.href}
-                    href={link.href}
-                    className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground rounded-lg hover:bg-accent/80 transition-all duration-200"
-                  >
-                    <span className="text-base">{link.icon}</span>
-                    <span className="hidden sm:inline">{link.label}</span>
-                  </a>
-                ))}
-              </nav>
+              {/* Navigation — active state managed by NavLinks client component */}
+              <NavLinks />
             </div>
           </header>
 

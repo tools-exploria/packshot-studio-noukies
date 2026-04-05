@@ -4,42 +4,37 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Stepper, UploadZone } from "@/components/shared";
 import { PROMPTS } from "@/lib/prompts";
-import { fileToBase64, downloadImage, generateImages, MODELS } from "@/lib/api";
+import { downloadImage, MODELS } from "@/lib/api";
 import { GalleryLightbox, SimpleLightbox } from "@/components/Lightbox";
+import { useGenerationPage } from "@/hooks/useGenerationPage";
 
 const STEPS = ["Produit", "Pattern", "Génération"];
 
 export default function ThreeDProduitPage() {
     const [step, setStep] = useState(0);
 
-    // Step 0 — technical product sheet
-    const [productFile, setProductFile] = useState(null);
-    const [productPreview, setProductPreview] = useState(null);
+    const {
+        loading, error, setError,
+        generatedImages,
+        imageDims,
+        selectedImages,
+        variantCount, setVariantCount,
+        resolution, setResolution,
+        aspectRatio, setAspectRatio,
+        productFile,
+        productPreview,
+        lightboxIdx, setLightboxIdx,
+        filledCount,
+        handleProductFile,
+        runGenerate,
+        toggleSelect,
+        toggleSelectAll,
+    } = useGenerationPage({ defaultVariantCount: 2 });
 
-    // Step 1 — fabric / texture image
+    // ── 3D-specific state: fabric/texture image ──────────────────
     const [fabricFile, setFabricFile] = useState(null);
     const [fabricPreview, setFabricPreview] = useState(null);
-
-    // Step 2 — generation
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState(null);
-    const [generatedImages, setGeneratedImages] = useState([]);
-    const [imageDims, setImageDims] = useState([]);
-    const [selectedImages, setSelectedImages] = useState(new Set());
-    const [variantCount, setVariantCount] = useState(2);
-    const [resolution, setResolution] = useState("2K");
-    const [aspectRatio, setAspectRatio] = useState("1:1");
-
-    // Lightbox
-    const [lightboxIdx, setLightboxIdx] = useState(null);
     const [refLightboxSrc, setRefLightboxSrc] = useState(null);
-
-    const handleProductFile = useCallback((f) => {
-        setProductFile(f);
-        const reader = new FileReader();
-        reader.onload = (e) => setProductPreview(e.target.result);
-        reader.readAsDataURL(f);
-    }, []);
 
     const handleFabricFile = useCallback((f) => {
         setFabricFile(f);
@@ -48,72 +43,13 @@ export default function ThreeDProduitPage() {
         reader.readAsDataURL(f);
     }, []);
 
+    // 3D generation uses a 180s timeout (heavier rendering)
     const handleGenerate = async (model = MODELS.FLASH) => {
         if (!productFile || !fabricFile) return;
-        setLoading(true);
-        setError(null);
-        setGeneratedImages(Array(variantCount).fill(null));
-        setSelectedImages(new Set());
-        setImageDims(Array(variantCount).fill(null));
-        try {
-            const productB64 = await fileToBase64(productFile);
-            const fabricB64 = await fileToBase64(fabricFile);
-
-            const results = await generateImages({
-                prompt: PROMPTS.product3D,
-                images: [productB64, fabricB64],
-                count: variantCount,
-                model,
-                resolution,
-                aspectRatio,
-                timeoutMs: 180_000,
-                onProgress: (i, image) => {
-                    setGeneratedImages((prev) => {
-                        const next = [...prev];
-                        next[i] = image;
-                        return next;
-                    });
-                    const img = new Image();
-                    img.onload = () => {
-                        setImageDims((prev) => {
-                            const next = [...prev];
-                            next[i] = { w: img.naturalWidth, h: img.naturalHeight };
-                            return next;
-                        });
-                    };
-                    img.src = `data:image/png;base64,${image}`;
-                },
-            });
-
-            if (!results.length) setError("Aucune image générée");
-            setGeneratedImages(results.length ? results : []);
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const toggleSelect = (idx) => {
-        setSelectedImages((prev) => {
-            const next = new Set(prev);
-            if (next.has(idx)) next.delete(idx);
-            else next.add(idx);
-            return next;
-        });
-    };
-
-    const toggleSelectAll = () => {
-        const filled = generatedImages.filter(Boolean);
-        if (selectedImages.size === filled.length) {
-            setSelectedImages(new Set());
-        } else {
-            setSelectedImages(new Set(generatedImages.map((img, i) => (img ? i : -1)).filter((i) => i >= 0)));
-        }
+        await runGenerate(PROMPTS.product3D, [productFile, fabricFile], model, 180_000);
     };
 
     const getFileName = (i) => `swaddle-3d-variante-${i + 1}.png`;
-    const filledCount = generatedImages.filter(Boolean).length;
 
     return (
         <div className="max-w-4xl mx-auto px-6 py-8">
@@ -187,19 +123,13 @@ export default function ThreeDProduitPage() {
                         {/* Reference images */}
                         <div className="flex gap-3 p-3 rounded-lg bg-muted/50 border border-dashed">
                             <div className="flex-1 text-center cursor-pointer" onClick={() => setRefLightboxSrc(productPreview)}>
-                                <img
-                                    src={productPreview}
-                                    alt="Fiche technique"
-                                    className="w-full aspect-square object-contain rounded-md bg-white hover:ring-2 hover:ring-primary transition-all"
-                                />
+                                <img src={productPreview} alt="Fiche technique"
+                                    className="w-full aspect-square object-contain rounded-md bg-white hover:ring-2 hover:ring-primary transition-all" />
                                 <p className="text-xs text-muted-foreground mt-1">Structure 🔍</p>
                             </div>
                             <div className="flex-1 text-center cursor-pointer" onClick={() => setRefLightboxSrc(fabricPreview)}>
-                                <img
-                                    src={fabricPreview}
-                                    alt="Tissu"
-                                    className="w-full aspect-square object-contain rounded-md bg-white hover:ring-2 hover:ring-primary transition-all"
-                                />
+                                <img src={fabricPreview} alt="Tissu"
+                                    className="w-full aspect-square object-contain rounded-md bg-white hover:ring-2 hover:ring-primary transition-all" />
                                 <p className="text-xs text-muted-foreground mt-1">Matière 🔍</p>
                             </div>
                         </div>
@@ -207,44 +137,30 @@ export default function ThreeDProduitPage() {
                         {/* Controls — only before first generation */}
                         {!generatedImages.length && !loading && (
                             <div className="space-y-4">
-                                {/* Variant count */}
                                 <div className="flex items-center gap-4">
                                     <label className="text-sm font-medium min-w-fit">Variantes</label>
-                                    <input
-                                        type="range"
-                                        min={1}
-                                        max={6}
-                                        value={variantCount}
+                                    <input type="range" min={1} max={6} value={variantCount}
                                         onChange={(e) => setVariantCount(Number(e.target.value))}
-                                        className="flex-1 accent-primary"
-                                    />
+                                        className="flex-1 accent-primary" />
                                     <span className="text-lg font-bold min-w-[2ch] text-center">{variantCount}</span>
                                 </div>
-                                {/* Resolution */}
                                 <div className="flex items-center gap-4">
                                     <label className="text-sm font-medium min-w-fit">Résolution</label>
                                     <div className="flex gap-2 flex-1">
                                         {["1K", "2K", "4K"].map((r) => (
-                                            <button
-                                                key={r}
-                                                onClick={() => setResolution(r)}
-                                                className={`flex-1 py-1.5 px-3 rounded-md text-sm font-medium border transition-all ${resolution === r ? "bg-primary text-primary-foreground border-primary" : "hover:bg-accent border-input"}`}
-                                            >
+                                            <button key={r} onClick={() => setResolution(r)}
+                                                className={`flex-1 py-1.5 px-3 rounded-md text-sm font-medium border transition-all ${resolution === r ? "bg-primary text-primary-foreground border-primary" : "hover:bg-accent border-input"}`}>
                                                 {r}
                                             </button>
                                         ))}
                                     </div>
                                 </div>
-                                {/* Aspect ratio */}
                                 <div className="flex items-center gap-4">
                                     <label className="text-sm font-medium min-w-fit">Ratio</label>
                                     <div className="flex gap-2 flex-1 flex-wrap">
                                         {["1:1", "4:3", "3:4", "16:9", "9:16"].map((r) => (
-                                            <button
-                                                key={r}
-                                                onClick={() => setAspectRatio(r)}
-                                                className={`py-1.5 px-3 rounded-md text-sm font-medium border transition-all ${aspectRatio === r ? "bg-primary text-primary-foreground border-primary" : "hover:bg-accent border-input"}`}
-                                            >
+                                            <button key={r} onClick={() => setAspectRatio(r)}
+                                                className={`py-1.5 px-3 rounded-md text-sm font-medium border transition-all ${aspectRatio === r ? "bg-primary text-primary-foreground border-primary" : "hover:bg-accent border-input"}`}>
                                                 {r}
                                             </button>
                                         ))}
@@ -270,34 +186,20 @@ export default function ThreeDProduitPage() {
                                 )}
                                 <div className="grid grid-cols-2 gap-4">
                                     {generatedImages.map((img, i) => (
-                                        <div
-                                            key={i}
-                                            className={`relative rounded-lg border overflow-hidden transition-all ${img ? "cursor-pointer hover:shadow-lg" : "animate-pulse"} ${img && selectedImages.has(i) ? "ring-2 ring-primary ring-offset-2" : ""}`}
-                                        >
+                                        <div key={i}
+                                            className={`relative rounded-lg border overflow-hidden transition-all ${img ? "cursor-pointer hover:shadow-lg" : "animate-pulse"} ${img && selectedImages.has(i) ? "ring-2 ring-primary ring-offset-2" : ""}`}>
                                             {img ? (
                                                 <>
-                                                    <img
-                                                        src={`data:image/png;base64,${img}`}
-                                                        alt={`Variante ${i + 1}`}
+                                                    <img src={`data:image/png;base64,${img}`} alt={`Variante ${i + 1}`}
                                                         className="w-full aspect-square object-contain bg-white"
-                                                        onClick={() => setLightboxIdx(i)}
-                                                    />
-                                                    {/* Checkbox */}
-                                                    <button
-                                                        onClick={(e) => { e.stopPropagation(); toggleSelect(i); }}
-                                                        className={`absolute top-2 left-2 w-6 h-6 rounded border-2 flex items-center justify-center text-xs font-bold transition-all ${selectedImages.has(i) ? "bg-primary border-primary text-primary-foreground" : "bg-white/80 border-gray-300 hover:border-primary"}`}
-                                                    >
+                                                        onClick={() => setLightboxIdx(i)} />
+                                                    <button onClick={(e) => { e.stopPropagation(); toggleSelect(i); }}
+                                                        className={`absolute top-2 left-2 w-6 h-6 rounded border-2 flex items-center justify-center text-xs font-bold transition-all ${selectedImages.has(i) ? "bg-primary border-primary text-primary-foreground" : "bg-white/80 border-gray-300 hover:border-primary"}`}>
                                                         {selectedImages.has(i) && "✓"}
                                                     </button>
-                                                    {/* Download */}
-                                                    <button
-                                                        onClick={(e) => { e.stopPropagation(); downloadImage(img, getFileName(i)); }}
+                                                    <button onClick={(e) => { e.stopPropagation(); downloadImage(img, getFileName(i)); }}
                                                         className="absolute top-2 right-2 w-8 h-8 rounded-full bg-white/80 hover:bg-white flex items-center justify-center text-sm shadow transition-all hover:scale-110"
-                                                        title="Télécharger"
-                                                    >
-                                                        ⬇
-                                                    </button>
-                                                    {/* Label */}
+                                                        title="Télécharger">⬇</button>
                                                     <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/40 to-transparent p-3">
                                                         <span className="text-white text-sm font-medium">Variante {i + 1}</span>
                                                     </div>
@@ -316,21 +218,14 @@ export default function ThreeDProduitPage() {
                             </div>
                         )}
 
-                        {/* Actions after generation */}
                         {filledCount > 0 && !loading && (
                             <div className="flex gap-2">
-                                <Button variant="outline" onClick={() => handleGenerate(MODELS.FLASH)}>
-                                    ⚡ Régénérer (Flash)
-                                </Button>
-                                <Button variant="outline" onClick={() => handleGenerate(MODELS.PRO)}>
-                                    🔄 Régénérer (Pro)
-                                </Button>
+                                <Button variant="outline" onClick={() => handleGenerate(MODELS.FLASH)}>⚡ Régénérer (Flash)</Button>
+                                <Button variant="outline" onClick={() => handleGenerate(MODELS.PRO)}>🔄 Régénérer (Pro)</Button>
                             </div>
                         )}
 
-                        <Button variant="outline" onClick={() => setStep(1)} className="w-full">
-                            ← Retour
-                        </Button>
+                        <Button variant="outline" onClick={() => setStep(1)} className="w-full">← Retour</Button>
                     </CardContent>
                 </Card>
             )}

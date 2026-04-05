@@ -1,148 +1,66 @@
 "use client";
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Stepper, UploadZone } from "@/components/shared";
 import { PROMPTS, SCENE_LABELS } from "@/lib/prompts";
-import { fileToBase64, downloadImage, generateImages, MODELS } from "@/lib/api";
+import { downloadImage, MODELS } from "@/lib/api";
+import { useExportPipeline } from "@/hooks/useExportPipeline";
+import { ExportPanel } from "@/components/ExportPanel";
 import { GalleryLightbox, SimpleLightbox } from "@/components/Lightbox";
+import { useGenerationPage } from "@/hooks/useGenerationPage";
 
 const STEPS = ["Produit", "Scène", "Génération", "Export"];
 
 export default function AmbiancePage() {
     const [step, setStep] = useState(0);
-    const [productFile, setProductFile] = useState(null);
-    const [productPreview, setProductPreview] = useState(null);
+
+    const {
+        loading, setLoading,
+        error, setError,
+        generatedImages,
+        imageDims,
+        selectedImages,
+        variantCount, setVariantCount,
+        resolution, setResolution,
+        aspectRatio, setAspectRatio,
+        productNotes, setProductNotes,
+        productFile,
+        productPreview,
+        lightboxIdx, setLightboxIdx,
+        editingIdx, setEditingIdx,
+        editPrompt, setEditPrompt,
+        editLoading,
+        filledCount,
+        handleProductFile,
+        runGenerate,
+        handleEditImage,
+        toggleSelect,
+        toggleSelectAll,
+    } = useGenerationPage();
+
+    // ── Ambiance-specific state ──────────────────────────────────
     const [sceneType, setSceneType] = useState("baby_sitting");
     const [customPrompt, setCustomPrompt] = useState("");
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState(null);
-    const [generatedImages, setGeneratedImages] = useState([]);
-    const [selectedImages, setSelectedImages] = useState(new Set());
-    const [imageDims, setImageDims] = useState([]);
-    const [variantCount, setVariantCount] = useState(4);
-    const [resolution, setResolution] = useState("2K");
-    const [aspectRatio, setAspectRatio] = useState("1:1");
-    // Product notes
-    const [productNotes, setProductNotes] = useState("");
-    // Lightbox
-    const [lightboxIdx, setLightboxIdx] = useState(null);
-    // Per-image edit
-    const [editingIdx, setEditingIdx] = useState(null);
-    const [editPrompt, setEditPrompt] = useState("");
-    const [editLoading, setEditLoading] = useState(false);
 
-    // Lightbox for reference images
-    const [refLightboxSrc, setRefLightboxSrc] = useState(null);
+    const pipeline = useExportPipeline({
+        generatedImages, imageDims, resolution, aspectRatio, selectedImages, setLoading, setError,
+    });
 
-    const handleProductFile = useCallback((f) => {
-        setProductFile(f);
-        const reader = new FileReader();
-        reader.onload = (e) => setProductPreview(e.target.result);
-        reader.readAsDataURL(f);
-    }, []);
-
+    // ── Generation handler (ambiance-specific prompt assembly) ──
     const handleGenerate = async (model = MODELS.FLASH) => {
         if (!productFile) return;
-        setLoading(true);
-        setError(null);
-        setGeneratedImages(Array(variantCount).fill(null));
-        setSelectedImages(new Set());
-        setImageDims(Array(variantCount).fill(null));
-        try {
-            const productB64 = await fileToBase64(productFile);
-            let prompt;
-            if (sceneType === "custom") {
-                prompt = PROMPTS.ambianceCustom(customPrompt);
-            } else {
-                prompt = PROMPTS.ambiance[sceneType];
-            }
-            if (!prompt) throw new Error("Prompt vide");
-            if (productNotes.trim()) prompt += `\n\nAdditional product notes: ${productNotes.trim()}`;
-
-            const results = await generateImages({
-                prompt,
-                images: [productB64],
-                count: variantCount,
-                model,
-                resolution,
-                aspectRatio,
-                onProgress: (i, image) => {
-                    setGeneratedImages((prev) => {
-                        const next = [...prev];
-                        next[i] = image;
-                        return next;
-                    });
-                    const img = new Image();
-                    img.onload = () => {
-                        setImageDims((prev) => {
-                            const next = [...prev];
-                            next[i] = { w: img.naturalWidth, h: img.naturalHeight };
-                            return next;
-                        });
-                    };
-                    img.src = `data:image/png;base64,${image}`;
-                },
-            });
-
-            if (!results.length) setError("Aucune image générée");
-            setGeneratedImages(results.length ? results : []);
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    // Per-image edit
-    const handleEditImage = async (idx, model = MODELS.PRO) => {
-        if (!editPrompt.trim() || !generatedImages[idx]) return;
-        setEditLoading(true);
-        setError(null);
-        try {
-            const res = await fetch("/api/generate", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ prompt: editPrompt.trim(), images: [generatedImages[idx]], model }),
-            });
-            const data = await res.json();
-            if (data.status === "success" && data.image) {
-                setGeneratedImages((prev) => [...prev, data.image]);
-                const img = new Image();
-                img.onload = () => setImageDims((prev) => [...prev, { w: img.naturalWidth, h: img.naturalHeight }]);
-                img.src = `data:image/png;base64,${data.image}`;
-                setEditingIdx(null);
-                setEditPrompt("");
-            } else {
-                setError(`Modification échouée: ${data.error || "Pas d'image"}`);
-            }
-        } catch (err) {
-            setError(`Modification échouée: ${err.message}`);
-        } finally {
-            setEditLoading(false);
-        }
-    };
-
-    const toggleSelect = (idx) => {
-        setSelectedImages((prev) => {
-            const next = new Set(prev);
-            if (next.has(idx)) next.delete(idx);
-            else next.add(idx);
-            return next;
-        });
-    };
-
-    const toggleSelectAll = () => {
-        const filled = generatedImages.filter(Boolean);
-        if (selectedImages.size === filled.length) {
-            setSelectedImages(new Set());
+        let prompt;
+        if (sceneType === "custom") {
+            prompt = PROMPTS.ambianceCustom(customPrompt);
         } else {
-            setSelectedImages(new Set(generatedImages.map((img, i) => (img ? i : -1)).filter((i) => i >= 0)));
+            prompt = PROMPTS.ambiance[sceneType];
         }
+        if (!prompt) { setError("Prompt vide"); return; }
+        if (productNotes.trim()) prompt += `\n\nAdditional product notes: ${productNotes.trim()}`;
+        await runGenerate(prompt, [productFile], model);
     };
-
-    const filledCount = generatedImages.filter(Boolean).length;
 
     return (
         <div className="max-w-4xl mx-auto px-6 py-8">
@@ -180,18 +98,13 @@ export default function AmbiancePage() {
                     <CardContent className="space-y-4">
                         <div className="grid grid-cols-1 gap-2">
                             {Object.entries(SCENE_LABELS).map(([key, label]) => (
-                                <button
-                                    key={key}
-                                    onClick={() => setSceneType(key)}
-                                    className={`text-left p-3 rounded-lg border transition-all ${sceneType === key ? "border-primary bg-primary/5 shadow-sm" : "hover:border-primary/30 hover:bg-accent/50"}`}
-                                >
+                                <button key={key} onClick={() => setSceneType(key)}
+                                    className={`text-left p-3 rounded-lg border transition-all ${sceneType === key ? "border-primary bg-primary/5 shadow-sm" : "hover:border-primary/30 hover:bg-accent/50"}`}>
                                     <span className="font-medium text-sm">{label}</span>
                                 </button>
                             ))}
-                            <button
-                                onClick={() => setSceneType("custom")}
-                                className={`text-left p-3 rounded-lg border transition-all ${sceneType === "custom" ? "border-primary bg-primary/5 shadow-sm" : "hover:border-primary/30 hover:bg-accent/50"}`}
-                            >
+                            <button onClick={() => setSceneType("custom")}
+                                className={`text-left p-3 rounded-lg border transition-all ${sceneType === "custom" ? "border-primary bg-primary/5 shadow-sm" : "hover:border-primary/30 hover:bg-accent/50"}`}>
                                 <span className="font-medium text-sm">✏️ Prompt personnalisé</span>
                             </button>
                         </div>
@@ -228,7 +141,7 @@ export default function AmbiancePage() {
                     <CardContent className="space-y-4">
                         {/* Reference images */}
                         <div className="flex gap-3 p-3 rounded-lg bg-muted/50 border border-dashed">
-                            <div className="flex-1 text-center cursor-pointer" onClick={() => setRefLightboxSrc(productPreview)}>
+                            <div className="flex-1 text-center cursor-pointer" onClick={() => pipeline.setRefLightboxSrc(productPreview)}>
                                 <img src={productPreview} alt="Produit" className="w-full aspect-square object-contain rounded-md bg-white hover:ring-2 hover:ring-primary transition-all" />
                                 <p className="text-xs text-muted-foreground mt-1">Produit 🔍</p>
                             </div>
@@ -243,25 +156,17 @@ export default function AmbiancePage() {
                             <div className="space-y-4">
                                 <div className="flex items-center gap-4">
                                     <label className="text-sm font-medium min-w-fit">Variantes</label>
-                                    <input
-                                        type="range"
-                                        min={1}
-                                        max={10}
-                                        value={variantCount}
+                                    <input type="range" min={1} max={10} value={variantCount}
                                         onChange={(e) => setVariantCount(Number(e.target.value))}
-                                        className="flex-1 accent-primary"
-                                    />
+                                        className="flex-1 accent-primary" />
                                     <span className="text-lg font-bold min-w-[2ch] text-center">{variantCount}</span>
                                 </div>
                                 <div className="flex items-center gap-4">
                                     <label className="text-sm font-medium min-w-fit">Résolution</label>
                                     <div className="flex gap-2 flex-1">
                                         {["1K", "2K", "4K"].map((r) => (
-                                            <button
-                                                key={r}
-                                                onClick={() => setResolution(r)}
-                                                className={`flex-1 py-1.5 px-3 rounded-md text-sm font-medium border transition-all ${resolution === r ? "bg-primary text-primary-foreground border-primary" : "hover:bg-accent border-input"}`}
-                                            >
+                                            <button key={r} onClick={() => setResolution(r)}
+                                                className={`flex-1 py-1.5 px-3 rounded-md text-sm font-medium border transition-all ${resolution === r ? "bg-primary text-primary-foreground border-primary" : "hover:bg-accent border-input"}`}>
                                                 {r}
                                             </button>
                                         ))}
@@ -271,26 +176,19 @@ export default function AmbiancePage() {
                                     <label className="text-sm font-medium min-w-fit">Ratio</label>
                                     <div className="flex gap-2 flex-1 flex-wrap">
                                         {["1:1", "4:3", "3:4", "16:9", "9:16"].map((r) => (
-                                            <button
-                                                key={r}
-                                                onClick={() => setAspectRatio(r)}
-                                                className={`py-1.5 px-3 rounded-md text-sm font-medium border transition-all ${aspectRatio === r ? "bg-primary text-primary-foreground border-primary" : "hover:bg-accent border-input"}`}
-                                            >
+                                            <button key={r} onClick={() => setAspectRatio(r)}
+                                                className={`py-1.5 px-3 rounded-md text-sm font-medium border transition-all ${aspectRatio === r ? "bg-primary text-primary-foreground border-primary" : "hover:bg-accent border-input"}`}>
                                                 {r}
                                             </button>
                                         ))}
                                     </div>
                                 </div>
-                                {/* Product-specific notes */}
                                 <div className="space-y-1">
                                     <label className="text-sm font-medium">Notes produit (optionnel)</label>
-                                    <textarea
-                                        value={productNotes}
-                                        onChange={(e) => setProductNotes(e.target.value)}
+                                    <textarea value={productNotes} onChange={(e) => setProductNotes(e.target.value)}
                                         placeholder="Ex: Le produit doit être au premier plan, bien visible. L'ambiance doit être chaleureuse."
                                         className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[60px] resize-y"
-                                        rows={2}
-                                    />
+                                        rows={2} />
                                     <p className="text-[11px] text-muted-foreground">Ajoutez des précisions spécifiques pour améliorer le résultat.</p>
                                 </div>
                                 <Button onClick={() => handleGenerate(MODELS.FLASH)} className="w-full">
@@ -313,74 +211,41 @@ export default function AmbiancePage() {
                                 )}
                                 <div className="grid grid-cols-2 gap-4">
                                     {generatedImages.map((img, i) => (
-                                        <div
-                                            key={i}
-                                            className={`relative rounded-lg border overflow-hidden transition-all ${img ? "cursor-pointer hover:shadow-lg" : "animate-pulse"
-                                                } ${img && selectedImages.has(i) ? "ring-2 ring-primary ring-offset-2" : ""}`}
-                                        >
+                                        <div key={i}
+                                            className={`relative rounded-lg border overflow-hidden transition-all ${img ? "cursor-pointer hover:shadow-lg" : "animate-pulse"} ${img && selectedImages.has(i) ? "ring-2 ring-primary ring-offset-2" : ""}`}>
                                             {img ? (
                                                 <>
-                                                    <img
-                                                        src={`data:image/png;base64,${img}`}
-                                                        alt={`Variante ${i + 1}`}
+                                                    <img src={`data:image/png;base64,${img}`} alt={`Variante ${i + 1}`}
                                                         className="w-full aspect-square object-contain bg-white"
-                                                        onClick={() => setLightboxIdx(i)}
-                                                    />
-                                                    <button
-                                                        onClick={(e) => { e.stopPropagation(); toggleSelect(i); }}
-                                                        className={`absolute top-2 left-2 w-6 h-6 rounded border-2 flex items-center justify-center text-xs font-bold transition-all ${selectedImages.has(i)
-                                                            ? "bg-primary border-primary text-primary-foreground"
-                                                            : "bg-white/80 border-gray-300 hover:border-primary"
-                                                            }`}
-                                                    >
+                                                        onClick={() => setLightboxIdx(i)} />
+                                                    <button onClick={(e) => { e.stopPropagation(); toggleSelect(i); }}
+                                                        className={`absolute top-2 left-2 w-6 h-6 rounded border-2 flex items-center justify-center text-xs font-bold transition-all ${selectedImages.has(i) ? "bg-primary border-primary text-primary-foreground" : "bg-white/80 border-gray-300 hover:border-primary"}`}>
                                                         {selectedImages.has(i) && "✓"}
                                                     </button>
-                                                    <button
-                                                        onClick={(e) => { e.stopPropagation(); downloadImage(img, pipeline.getFileName(i)); }}
+                                                    <button onClick={(e) => { e.stopPropagation(); downloadImage(img, pipeline.getFileName(i)); }}
                                                         className="absolute top-2 right-2 w-8 h-8 rounded-full bg-white/80 hover:bg-white flex items-center justify-center text-sm shadow transition-all hover:scale-110"
-                                                        title="Télécharger"
-                                                    >
-                                                        ⬇
-                                                    </button>
+                                                        title="Télécharger">⬇</button>
                                                     <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/40 to-transparent p-3 flex items-center justify-between">
                                                         <span className="text-white text-sm font-medium">Variante {i + 1}</span>
-                                                        <button
-                                                            onClick={(e) => { e.stopPropagation(); setEditingIdx(editingIdx === i ? null : i); setEditPrompt(""); }}
+                                                        <button onClick={(e) => { e.stopPropagation(); setEditingIdx(editingIdx === i ? null : i); setEditPrompt(""); }}
                                                             className="text-white/80 hover:text-white text-xs bg-white/20 hover:bg-white/30 rounded px-2 py-0.5 transition-all"
-                                                            title="Modifier cette image"
-                                                        >
-                                                            ✏️ Modifier
-                                                        </button>
+                                                            title="Modifier cette image">✏️ Modifier</button>
                                                     </div>
                                                     {editingIdx === i && (
                                                         <div className="absolute left-0 right-0 bottom-10 p-2 bg-background border-t" onClick={(e) => e.stopPropagation()}>
                                                             <div className="flex gap-1">
-                                                                <input
-                                                                    type="text"
-                                                                    value={editPrompt}
+                                                                <input type="text" value={editPrompt}
                                                                     onChange={(e) => setEditPrompt(e.target.value)}
                                                                     onKeyDown={(e) => { if (e.key === "Enter" && editPrompt.trim()) handleEditImage(i); }}
                                                                     placeholder="Décrivez la modification…"
                                                                     className="flex-1 rounded-md border border-input bg-background px-2 py-1 text-xs"
-                                                                    autoFocus
-                                                                />
-                                                                <Button
-                                                                    size="sm"
-                                                                    variant="outline"
-                                                                    disabled={editLoading || !editPrompt.trim()}
-                                                                    onClick={() => handleEditImage(i, MODELS.FLASH)}
-                                                                    className="text-xs h-7"
-                                                                    title="Rapide (Flash)"
-                                                                >
+                                                                    autoFocus />
+                                                                <Button size="sm" variant="outline" disabled={editLoading || !editPrompt.trim()}
+                                                                    onClick={() => handleEditImage(i, MODELS.FLASH)} className="text-xs h-7" title="Rapide (Flash)">
                                                                     {editLoading ? "…" : "⚡"}
                                                                 </Button>
-                                                                <Button
-                                                                    size="sm"
-                                                                    disabled={editLoading || !editPrompt.trim()}
-                                                                    onClick={() => handleEditImage(i, MODELS.PRO)}
-                                                                    className="text-xs h-7"
-                                                                    title="Qualité (Pro)"
-                                                                >
+                                                                <Button size="sm" disabled={editLoading || !editPrompt.trim()}
+                                                                    onClick={() => handleEditImage(i, MODELS.PRO)} className="text-xs h-7" title="Qualité (Pro)">
                                                                     {editLoading ? "…" : "Pro"}
                                                                 </Button>
                                                             </div>
@@ -404,18 +269,11 @@ export default function AmbiancePage() {
                             </div>
                         )}
 
-                        {/* Actions */}
                         {filledCount > 0 && !loading && (
                             <div className="flex gap-2">
-                                <Button variant="outline" onClick={() => handleGenerate(MODELS.FLASH)}>
-                                    ⚡ Régénérer (Flash)
-                                </Button>
-                                <Button variant="outline" onClick={() => handleGenerate(MODELS.PRO)}>
-                                    🔄 Régénérer (Pro)
-                                </Button>
-                                <Button onClick={() => setStep(3)} className="flex-1">
-                                    Export →
-                                </Button>
+                                <Button variant="outline" onClick={() => handleGenerate(MODELS.FLASH)}>⚡ Régénérer (Flash)</Button>
+                                <Button variant="outline" onClick={() => handleGenerate(MODELS.PRO)}>🔄 Régénérer (Pro)</Button>
+                                <Button onClick={() => setStep(3)} className="flex-1">Export →</Button>
                             </div>
                         )}
                     </CardContent>
@@ -436,26 +294,16 @@ export default function AmbiancePage() {
                     <CardContent className="space-y-4">
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                             {generatedImages.map((img, idx) => img && (
-                                <div
-                                    key={idx}
-                                    onClick={() => toggleSelect(idx)}
-                                    className={`relative text-center cursor-pointer rounded-lg border-2 overflow-hidden transition-all hover:shadow-lg ${selectedImages.has(idx) ? "border-primary ring-2 ring-primary ring-offset-2" : "border-transparent"
-                                        }`}
-                                >
-                                    <img
-                                        src={`data:image/png;base64,${img}`}
-                                        alt={`Variante ${idx + 1}`}
-                                        className="w-full aspect-square object-contain bg-white"
-                                    />
-                                    <div className={`absolute top-2 left-2 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shadow transition-all ${selectedImages.has(idx) ? "bg-primary text-primary-foreground" : "bg-white/80 text-muted-foreground"
-                                        }`}>
+                                <div key={idx} onClick={() => toggleSelect(idx)}
+                                    className={`relative text-center cursor-pointer rounded-lg border-2 overflow-hidden transition-all hover:shadow-lg ${selectedImages.has(idx) ? "border-primary ring-2 ring-primary ring-offset-2" : "border-transparent"}`}>
+                                    <img src={`data:image/png;base64,${img}`} alt={`Variante ${idx + 1}`}
+                                        className="w-full aspect-square object-contain bg-white" />
+                                    <div className={`absolute top-2 left-2 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shadow transition-all ${selectedImages.has(idx) ? "bg-primary text-primary-foreground" : "bg-white/80 text-muted-foreground"}`}>
                                         {selectedImages.has(idx) ? "✓" : idx + 1}
                                     </div>
-                                    <button
-                                        onClick={(e) => { e.stopPropagation(); setLightboxIdx(idx); }}
+                                    <button onClick={(e) => { e.stopPropagation(); setLightboxIdx(idx); }}
                                         className="absolute top-2 right-2 w-6 h-6 rounded-full bg-white/80 hover:bg-white flex items-center justify-center text-xs shadow"
-                                        title="Agrandir"
-                                    >🔍</button>
+                                        title="Agrandir">🔍</button>
                                     <div className="bg-muted/80 py-1 px-2">
                                         <p className="text-xs font-medium">Variante {idx + 1}</p>
                                         <p className="text-[10px] text-muted-foreground">
@@ -475,63 +323,13 @@ export default function AmbiancePage() {
                             </span>
                         </div>
 
-                        {/* Simple download buttons — no background processing for ambiance */}
-                        <div className="grid grid-cols-2 gap-3">
-                            <Button
-                                onClick={async () => {
-                                    setLoading(true);
-                                    try {
-                                        const indices = selectedImages.size > 0
-                                            ? [...selectedImages].sort()
-                                            : generatedImages.map((img, i) => img ? i : -1).filter(i => i >= 0);
-                                        for (let n = 0; n < indices.length; n++) {
-                                            const idx = indices[n];
-                                            const dims = imageDims[idx];
-                                            const dimStr = dims ? `${dims.w}x${dims.h}` : resolution;
-                                            downloadImage(generatedImages[idx], `ambiance_${idx + 1}_${dimStr}.png`);
-                                            if (n < indices.length - 1) await new Promise(r => setTimeout(r, 300));
-                                        }
-                                    } catch (err) { setError(err.message); }
-                                    finally { setLoading(false); }
-                                }}
-                                disabled={loading}
-                                className="w-full"
-                                size="lg"
-                            >
-                                {loading ? "Préparation..." : selectedImages.size > 0 ? `⬇ PNG (${selectedImages.size})` : `⬇ PNG (${filledCount})`}
-                            </Button>
-                            <Button
-                                onClick={async () => {
-                                    setLoading(true);
-                                    try {
-                                        const indices = selectedImages.size > 0
-                                            ? [...selectedImages].sort()
-                                            : generatedImages.map((img, i) => img ? i : -1).filter(i => i >= 0);
-                                        const { jsPDF } = await import("jspdf");
-                                        const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-                                        const pageW = pdf.internal.pageSize.getWidth();
-                                        const pageH = pdf.internal.pageSize.getHeight();
-                                        const margin = 10;
-                                        for (let n = 0; n < indices.length; n++) {
-                                            if (n > 0) pdf.addPage();
-                                            const maxW = pageW - margin * 2;
-                                            const maxH = pageH - margin * 2;
-                                            const imgSize = Math.min(maxW, maxH);
-                                            const x = (pageW - imgSize) / 2;
-                                            const y = (pageH - imgSize) / 2;
-                                            pdf.addImage(`data:image/png;base64,${generatedImages[indices[n]]}`, "PNG", x, y, imgSize, imgSize);
-                                        }
-                                        pdf.save("noukies_ambiance.pdf");
-                                    } catch (err) { setError(err.message); }
-                                    finally { setLoading(false); }
-                                }}
-                                disabled={loading}
-                                variant="outline"
-                                size="lg"
-                            >
-                                {loading ? "Préparation..." : selectedImages.size > 0 ? `📄 PDF (${selectedImages.size})` : `📄 PDF (${filledCount})`}
-                            </Button>
-                        </div>
+                        <ExportPanel
+                            pipeline={pipeline}
+                            generatedImages={generatedImages}
+                            loading={loading}
+                            filledCount={filledCount}
+                            selectedImages={selectedImages}
+                        />
 
                         <Button variant="outline" onClick={() => setStep(2)} className="w-full">← Retour</Button>
                     </CardContent>
@@ -544,19 +342,15 @@ export default function AmbiancePage() {
                 imageDims={imageDims}
                 lightboxIdx={lightboxIdx}
                 setLightboxIdx={setLightboxIdx}
-                onDownload={(idx) => {
-                    const dims = imageDims[idx];
-                    const dimStr = dims ? `${dims.w}x${dims.h}` : resolution;
-                    downloadImage(generatedImages[idx], `ambiance_${idx + 1}_${dimStr}.png`);
-                }}
+                onDownload={(idx) => downloadImage(generatedImages[idx], pipeline.getFileName(idx))}
                 selectedImages={selectedImages}
                 toggleSelect={toggleSelect}
             />
 
             {/* Reference lightbox */}
             <SimpleLightbox
-                src={refLightboxSrc}
-                onClose={() => setRefLightboxSrc(null)}
+                src={pipeline.refLightboxSrc}
+                onClose={() => pipeline.setRefLightboxSrc(null)}
             />
         </div>
     );
