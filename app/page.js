@@ -21,6 +21,15 @@ const MODES = [
     iconBg: "bg-[#2d4a9e]/10",
   },
   {
+    title: "Broderie",
+    description: "Appliquez un motif brodé sur votre produit. Upload packshot + design broderie, choix du placement, rendu réaliste.",
+    href: "/broderie",
+    icon: "🪡",
+    badge: "5 étapes",
+    accent: "border-l-[#e8a87c]",
+    iconBg: "bg-[#e8a87c]/10",
+  },
+  {
     title: "Angles alternatifs",
     description: "Générez des vues alternatives de votre packshot validé : face, 3/4, dos, flat-lay, détail macro.",
     href: "/angles",
