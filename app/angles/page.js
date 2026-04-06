@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -13,16 +13,25 @@ import { ImageGrid } from "@/components/ImageGrid";
 import { GalleryLightbox, SimpleLightbox } from "@/components/Lightbox";
 import { useGenerationPage } from "@/hooks/useGenerationPage";
 
-const STEPS = ["Packshot validé", "Angle", "Génération", "Export"];
+const STEPS = ["Photos référence", "Angle", "Génération", "Export"];
 
 const ANGLE_OPTIONS = [
     { key: "front", label: "Face", desc: "Vue frontale, caméra perpendiculaire" },
     { key: "3/4-face", label: "3/4 Face", desc: "45° avant-gauche, perspective légère" },
     { key: "profile", label: "Profil", desc: "90° latéral, profondeur du produit" },
     { key: "3/4-dos", label: "3/4 Dos", desc: "45° arrière-droit" },
-    { key: "dos", label: "Dos", desc: "Vue arrière, étiquettes et fermetures" },
+    { key: "dos", label: "Dos", desc: "Vue arrière, fermetures" },
     { key: "flat-lay", label: "Flat Lay", desc: "Vue du dessus, produit à plat" },
     { key: "detail-macro", label: "Détail Macro", desc: "Gros plan texture, coutures, broderie" },
+];
+
+const VIEW_LABELS = [
+    "vue de face (front)",
+    "vue de profil (side)",
+    "vue de dos (back)",
+    "vue 3/4 (three-quarter)",
+    "vue du dessus (top-down)",
+    "détail / gros plan (detail)",
 ];
 
 export default function AnglesPage() {
@@ -57,15 +66,41 @@ export default function AnglesPage() {
     const [angleType, setAngleType] = useState("front");
     const [detailFocus, setDetailFocus] = useState("");
 
+    // Multi-ref: extra reference images beyond the main product upload
+    const [extraRefs, setExtraRefs] = useState([]); // [{file, preview, viewLabel}]
+
     const pipeline = useExportPipeline({
         generatedImages, imageDims, resolution, aspectRatio, selectedImages, setLoading, setError,
     });
 
+    const handleAddRef = useCallback((f) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            setExtraRefs((prev) => [...prev, { file: f, preview: e.target.result, viewLabel: "" }]);
+        };
+        reader.readAsDataURL(f);
+    }, []);
+
+    const handleRemoveRef = (idx) => {
+        setExtraRefs((prev) => prev.filter((_, i) => i !== idx));
+    };
+
+    const handleRefLabel = (idx, label) => {
+        setExtraRefs((prev) => prev.map((r, i) => i === idx ? { ...r, viewLabel: label } : r));
+    };
+
     // ── Generation handler ───────────────────────────────────────
     const handleGenerate = async (model = MODELS.FLASH) => {
         if (!productFile) return;
-        const prompt = PROMPTS.alternateAngle(angleType, detailFocus.trim(), productNotes.trim() || "");
-        await runGenerate(prompt, [productFile], model);
+
+        // Build file array and descriptions
+        const files = [productFile, ...extraRefs.map((r) => r.file)];
+        const descriptions = extraRefs.length > 0
+            ? ["main reference view", ...extraRefs.map((r) => r.viewLabel || "additional view")]
+            : null;
+
+        const prompt = PROMPTS.alternateAngle(angleType, detailFocus.trim(), productNotes.trim() || "", descriptions);
+        await runGenerate(prompt, files, model);
     };
 
     return (
@@ -76,17 +111,77 @@ export default function AnglesPage() {
                 <div className="bg-destructive/10 text-destructive rounded-lg p-4 mb-6 text-sm">{error}</div>
             )}
 
-            {/* Step 0: Product upload */}
+            {/* Step 0: Product upload (multi-ref) */}
             {step === 0 && (
                 <Card>
-                    <CardHeader><CardTitle>Packshot validé de référence</CardTitle></CardHeader>
+                    <CardHeader>
+                        <CardTitle>Photos de référence du produit</CardTitle>
+                        <p className="text-sm text-muted-foreground">
+                            Uploadez une ou plusieurs photos du même produit sous différents angles.
+                            Plus vous fournissez de vues, plus le résultat sera fidèle.
+                        </p>
+                    </CardHeader>
                     <CardContent className="space-y-4">
-                        <UploadZone
-                            onFile={handleProductFile}
-                            label="Uploadez votre packshot validé"
-                            sublabel="PNG ou JPG — le packshot qui servira de référence d'identité"
-                            preview={productPreview}
-                        />
+                        {/* Main product photo */}
+                        <div>
+                            <Label className="text-xs text-muted-foreground mb-1 block">Photo principale *</Label>
+                            <UploadZone
+                                onFile={handleProductFile}
+                                label="Photo principale du produit"
+                                sublabel="PNG ou JPG — la vue principale de référence"
+                                preview={productPreview}
+                            />
+                        </div>
+
+                        {/* Extra references */}
+                        {extraRefs.length > 0 && (
+                            <div className="space-y-3">
+                                <Label className="text-xs text-muted-foreground">Photos supplémentaires</Label>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                    {extraRefs.map((ref, idx) => (
+                                        <div key={idx} className="relative rounded-lg border bg-muted/30 p-2 space-y-2">
+                                            <img src={ref.preview} alt={`Ref ${idx + 2}`}
+                                                className="w-full aspect-square object-contain rounded-md bg-white" />
+                                            <select
+                                                value={ref.viewLabel}
+                                                onChange={(e) => handleRefLabel(idx, e.target.value)}
+                                                className="w-full text-xs rounded border border-input bg-background px-2 py-1"
+                                            >
+                                                <option value="">Type de vue...</option>
+                                                {VIEW_LABELS.map((l) => (
+                                                    <option key={l} value={l}>{l}</option>
+                                                ))}
+                                            </select>
+                                            <button onClick={() => handleRemoveRef(idx)}
+                                                className="absolute top-1 right-1 w-5 h-5 rounded-full bg-destructive/80 text-destructive-foreground flex items-center justify-center text-xs hover:bg-destructive"
+                                                title="Retirer">×</button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Add more refs */}
+                        {productFile && (
+                            <div className="border border-dashed rounded-lg p-3">
+                                <UploadZone
+                                    onFile={handleAddRef}
+                                    label="+ Ajouter une vue supplémentaire"
+                                    sublabel="Dos, profil, détail... (optionnel, jusqu'à 13 photos)"
+                                    preview={null}
+                                />
+                            </div>
+                        )}
+
+                        {productFile && (
+                            <div className="bg-muted/50 rounded-lg p-3 text-xs text-muted-foreground">
+                                {extraRefs.length === 0
+                                    ? "1 photo — le modèle devra imaginer les angles non visibles. Ajoutez d'autres vues pour un résultat plus fidèle."
+                                    : `${1 + extraRefs.length} photo${extraRefs.length > 0 ? "s" : ""} de référence — le modèle combinera toutes les vues pour comprendre la structure 3D du produit.`
+                                }
+                            </div>
+                        )}
+
                         <Button onClick={() => setStep(1)} disabled={!productFile} className="w-full">
                             Continuer →
                         </Button>
@@ -98,8 +193,10 @@ export default function AnglesPage() {
             {step === 1 && (
                 <Card>
                     <CardHeader>
-                        <CardTitle>Choix de l&apos;angle</CardTitle>
-                        <p className="text-sm text-muted-foreground">Sélectionnez l&apos;angle de vue à générer.</p>
+                        <CardTitle>Choix de l&apos;angle à générer</CardTitle>
+                        <p className="text-sm text-muted-foreground">
+                            {1 + extraRefs.length} photo{extraRefs.length > 0 ? "s" : ""} de référence chargée{extraRefs.length > 0 ? "s" : ""}.
+                        </p>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="grid grid-cols-1 gap-2">
@@ -119,7 +216,7 @@ export default function AnglesPage() {
                                     type="text"
                                     value={detailFocus}
                                     onChange={(e) => setDetailFocus(e.target.value)}
-                                    placeholder="Ex: broderie sur le chest, étiquette Noukies, texture du tissu..."
+                                    placeholder="Ex: broderie sur le chest, texture du tissu, fermeture éclair..."
                                     className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                                 />
                             </div>
@@ -139,19 +236,25 @@ export default function AnglesPage() {
                     <CardHeader>
                         <CardTitle>Génération — angle {ANGLE_OPTIONS.find(o => o.key === angleType)?.label}</CardTitle>
                         <p className="text-sm text-muted-foreground">
-                            {variantCount} variante{variantCount > 1 ? "s" : ""} générée{variantCount > 1 ? "s" : ""} par IA.
+                            {variantCount} variante{variantCount > 1 ? "s" : ""} à partir de {1 + extraRefs.length} référence{extraRefs.length > 0 ? "s" : ""}.
                         </p>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        {/* Reference */}
-                        <div className="flex gap-3 p-3 rounded-lg bg-muted/50 border border-dashed">
-                            <div className="flex-1 text-center cursor-pointer" onClick={() => pipeline.setRefLightboxSrc(productPreview)}>
-                                <img src={productPreview} alt="Produit" className="w-full aspect-square object-contain rounded-md bg-white hover:ring-2 hover:ring-primary transition-all" />
-                                <p className="text-xs text-muted-foreground mt-1">Référence 🔍</p>
+                        {/* Reference thumbnails */}
+                        <div className="flex gap-3 p-3 rounded-lg bg-muted/50 border border-dashed overflow-x-auto">
+                            <div className="flex-shrink-0 w-24 text-center cursor-pointer" onClick={() => pipeline.setRefLightboxSrc(productPreview)}>
+                                <img src={productPreview} alt="Principale" className="w-full aspect-square object-contain rounded-md bg-white hover:ring-2 hover:ring-primary transition-all" />
+                                <p className="text-[10px] text-muted-foreground mt-1">Principale 🔍</p>
                             </div>
-                            <div className="flex-1 flex flex-col items-center justify-center">
+                            {extraRefs.map((ref, idx) => (
+                                <div key={idx} className="flex-shrink-0 w-24 text-center cursor-pointer" onClick={() => pipeline.setRefLightboxSrc(ref.preview)}>
+                                    <img src={ref.preview} alt={`Ref ${idx + 2}`} className="w-full aspect-square object-contain rounded-md bg-white hover:ring-2 hover:ring-primary transition-all" />
+                                    <p className="text-[10px] text-muted-foreground mt-1">{ref.viewLabel || `Ref ${idx + 2}`} 🔍</p>
+                                </div>
+                            ))}
+                            <div className="flex-shrink-0 w-24 flex flex-col items-center justify-center">
                                 <p className="text-sm font-medium">{ANGLE_OPTIONS.find(o => o.key === angleType)?.label}</p>
-                                <p className="text-xs text-muted-foreground">{ANGLE_OPTIONS.find(o => o.key === angleType)?.desc}</p>
+                                <p className="text-[10px] text-muted-foreground text-center">{ANGLE_OPTIONS.find(o => o.key === angleType)?.desc}</p>
                             </div>
                         </div>
 
