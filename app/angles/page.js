@@ -26,12 +26,17 @@ const ANGLE_OPTIONS = [
 ];
 
 const VIEW_LABELS = [
-    "vue de face (front)",
-    "vue de profil (side)",
-    "vue de dos (back)",
-    "vue 3/4 (three-quarter)",
-    "vue du dessus (top-down)",
-    "détail / gros plan (detail)",
+    "front view",
+    "side view",
+    "back view",
+    "three-quarter view",
+    "top-down view",
+    "detail / close-up",
+];
+
+const REF_ROLES = [
+    { value: "same", label: "Même produit, autre angle" },
+    { value: "structure", label: "Produit similaire (structure seulement)" },
 ];
 
 export default function AnglesPage() {
@@ -67,7 +72,7 @@ export default function AnglesPage() {
     const [detailFocus, setDetailFocus] = useState("");
 
     // Multi-ref: extra reference images beyond the main product upload
-    const [extraRefs, setExtraRefs] = useState([]); // [{file, preview, viewLabel}]
+    const [extraRefs, setExtraRefs] = useState([]); // [{file, preview, viewLabel, role}]
 
     const pipeline = useExportPipeline({
         generatedImages, imageDims, resolution, aspectRatio, selectedImages, setLoading, setError,
@@ -76,7 +81,7 @@ export default function AnglesPage() {
     const handleAddRef = useCallback((f) => {
         const reader = new FileReader();
         reader.onload = (e) => {
-            setExtraRefs((prev) => [...prev, { file: f, preview: e.target.result, viewLabel: "" }]);
+            setExtraRefs((prev) => [...prev, { file: f, preview: e.target.result, viewLabel: "", role: "same" }]);
         };
         reader.readAsDataURL(f);
     }, []);
@@ -89,14 +94,24 @@ export default function AnglesPage() {
         setExtraRefs((prev) => prev.map((r, i) => i === idx ? { ...r, viewLabel: label } : r));
     };
 
+    const handleRefRole = (idx, role) => {
+        setExtraRefs((prev) => prev.map((r, i) => i === idx ? { ...r, role } : r));
+    };
+
     // ── Generation handler ───────────────────────────────────────
     const handleGenerate = async (model = MODELS.FLASH) => {
         if (!productFile) return;
 
-        // Build file array and descriptions
+        // Build file array and ref descriptors
         const files = [productFile, ...extraRefs.map((r) => r.file)];
         const descriptions = extraRefs.length > 0
-            ? ["main reference view", ...extraRefs.map((r) => r.viewLabel || "additional view")]
+            ? [
+                { label: "main reference view", role: "identity" },
+                ...extraRefs.map((r) => ({
+                    label: r.viewLabel || "additional view",
+                    role: r.role === "structure" ? "structure" : "identity",
+                })),
+            ]
             : null;
 
         const prompt = PROMPTS.alternateAngle(angleType, detailFocus.trim(), productNotes.trim() || "", descriptions);
@@ -139,9 +154,18 @@ export default function AnglesPage() {
                                 <Label className="text-xs text-muted-foreground">Photos supplémentaires</Label>
                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                                     {extraRefs.map((ref, idx) => (
-                                        <div key={idx} className="relative rounded-lg border bg-muted/30 p-2 space-y-2">
+                                        <div key={idx} className={`relative rounded-lg border p-2 space-y-2 ${ref.role === "structure" ? "bg-amber-50 border-amber-200" : "bg-muted/30"}`}>
                                             <img src={ref.preview} alt={`Ref ${idx + 2}`}
                                                 className="w-full aspect-square object-contain rounded-md bg-white" />
+                                            <select
+                                                value={ref.role}
+                                                onChange={(e) => handleRefRole(idx, e.target.value)}
+                                                className="w-full text-xs rounded border border-input bg-background px-2 py-1 font-medium"
+                                            >
+                                                {REF_ROLES.map((r) => (
+                                                    <option key={r.value} value={r.value}>{r.label}</option>
+                                                ))}
+                                            </select>
                                             <select
                                                 value={ref.viewLabel}
                                                 onChange={(e) => handleRefLabel(idx, e.target.value)}
@@ -152,6 +176,9 @@ export default function AnglesPage() {
                                                     <option key={l} value={l}>{l}</option>
                                                 ))}
                                             </select>
+                                            {ref.role === "structure" && (
+                                                <p className="text-[10px] text-amber-600">Forme/structure seulement — couleur ignorée</p>
+                                            )}
                                             <button onClick={() => handleRemoveRef(idx)}
                                                 className="absolute top-1 right-1 w-5 h-5 rounded-full bg-destructive/80 text-destructive-foreground flex items-center justify-center text-xs hover:bg-destructive"
                                                 title="Retirer">×</button>
