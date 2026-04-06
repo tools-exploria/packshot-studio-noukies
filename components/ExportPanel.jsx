@@ -21,7 +21,7 @@ export function ExportPanel({ pipeline, generatedImages, loading, filledCount, s
         exportSize, setExportSize,
         refLightboxSrc, setRefLightboxSrc,
         generateGreenScreen, generateAllGreenScreens,
-        handleExport, handleExportPDF,
+        handleExport, handleExportJPG, handleExportPDF,
     } = pipeline;
 
     return (
@@ -126,37 +126,48 @@ export function ExportPanel({ pipeline, generatedImages, loading, filledCount, s
             <div className="flex items-center gap-4">
                 <label className="text-sm font-medium min-w-fit">Redimensionner</label>
                 <div className="flex gap-2 flex-1 flex-wrap">
-                    {["", "1024x1024", "2048x2048", "4096x4096"].map((size) => (
+                    {[
+                        { value: "", label: "Natif" },
+                        { value: "1024x1024", label: "1024x1024" },
+                        { value: "1560x2000", label: "1560x2000" },
+                        { value: "2048x2048", label: "2048x2048" },
+                        { value: "4096x4096", label: "4096x4096" },
+                    ].map(({ value, label }) => (
                         <button
-                            key={size || "native"}
-                            onClick={() => setExportSize(size)}
-                            className={`py-1.5 px-3 rounded-md text-sm font-medium border transition-all ${exportSize === size ? "bg-primary text-primary-foreground border-primary" : "hover:bg-accent border-input"}`}
+                            key={value || "native"}
+                            onClick={() => setExportSize(value)}
+                            className={`py-1.5 px-3 rounded-md text-sm font-medium border transition-all ${exportSize === value ? "bg-primary text-primary-foreground border-primary" : "hover:bg-accent border-input"}`}
                         >
-                            {size || "Natif"}
+                            {label}
                         </button>
                     ))}
                 </div>
             </div>
 
             {/* Export buttons */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
                 <Button onClick={handleExport} disabled={loading} className="w-full" size="lg">
                     {loading && !detourProgress
-                        ? "Préparation..."
+                        ? "..."
                         : detourProgress
-                            ? `Détourage ${detourProgress}...`
+                            ? `${detourProgress}...`
                             : selectedImages.size > 0
                                 ? `⬇ PNG (${selectedImages.size})`
                                 : `⬇ PNG (${filledCount})`}
                 </Button>
+                <Button onClick={handleExportJPG} disabled={loading} className="w-full" size="lg" variant="outline">
+                    {loading && !detourProgress
+                        ? "..."
+                        : selectedImages.size > 0
+                            ? `⬇ JPG (${selectedImages.size})`
+                            : `⬇ JPG (${filledCount})`}
+                </Button>
                 <Button onClick={handleExportPDF} disabled={loading} variant="outline" size="lg">
                     {loading && !detourProgress
-                        ? "Préparation..."
-                        : detourProgress
-                            ? `Détourage ${detourProgress}...`
-                            : selectedImages.size > 0
-                                ? `📄 PDF (${selectedImages.size})`
-                                : `📄 PDF (${filledCount})`}
+                        ? "..."
+                        : selectedImages.size > 0
+                            ? `📄 PDF (${selectedImages.size})`
+                            : `📄 PDF (${filledCount})`}
                 </Button>
             </div>
         </div>

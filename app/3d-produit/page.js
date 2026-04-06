@@ -5,10 +5,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Stepper, UploadZone } from "@/components/shared";
 import { PROMPTS } from "@/lib/prompts";
 import { downloadImage, MODELS } from "@/lib/api";
+import { useExportPipeline } from "@/hooks/useExportPipeline";
+import { ExportPanel } from "@/components/ExportPanel";
+import { GenerationControls } from "@/components/GenerationControls";
+import { ImageGrid } from "@/components/ImageGrid";
 import { GalleryLightbox, SimpleLightbox } from "@/components/Lightbox";
 import { useGenerationPage } from "@/hooks/useGenerationPage";
 
-const STEPS = ["Produit", "Pattern", "Génération"];
+const STEPS = ["Produit", "Matière", "Génération", "Export"];
 
 export default function ThreeDProduitPage() {
     const [step, setStep] = useState(0);
@@ -21,12 +25,18 @@ export default function ThreeDProduitPage() {
         variantCount, setVariantCount,
         resolution, setResolution,
         aspectRatio, setAspectRatio,
+        activePreset, applyPreset, clearPreset,
+        productNotes, setProductNotes,
         productFile,
         productPreview,
         lightboxIdx, setLightboxIdx,
+        editingIdx, setEditingIdx,
+        editPrompt, setEditPrompt,
+        editLoading,
         filledCount,
         handleProductFile,
         runGenerate,
+        handleEditImage,
         toggleSelect,
         toggleSelectAll,
     } = useGenerationPage({ defaultVariantCount: 2 });
@@ -34,7 +44,12 @@ export default function ThreeDProduitPage() {
     // ── 3D-specific state: fabric/texture image ──────────────────
     const [fabricFile, setFabricFile] = useState(null);
     const [fabricPreview, setFabricPreview] = useState(null);
-    const [refLightboxSrc, setRefLightboxSrc] = useState(null);
+
+    const pipeline = useExportPipeline({
+        generatedImages, imageDims, resolution, aspectRatio, selectedImages,
+        setLoading: () => {},
+        setError,
+    });
 
     const handleFabricFile = useCallback((f) => {
         setFabricFile(f);
@@ -48,8 +63,6 @@ export default function ThreeDProduitPage() {
         if (!productFile || !fabricFile) return;
         await runGenerate(PROMPTS.product3D, [productFile, fabricFile], model, 180_000);
     };
-
-    const getFileName = (i) => `swaddle-3d-variante-${i + 1}.png`;
 
     return (
         <div className="max-w-4xl mx-auto px-6 py-8">
@@ -122,110 +135,101 @@ export default function ThreeDProduitPage() {
                     <CardContent className="space-y-4">
                         {/* Reference images */}
                         <div className="flex gap-3 p-3 rounded-lg bg-muted/50 border border-dashed">
-                            <div className="flex-1 text-center cursor-pointer" onClick={() => setRefLightboxSrc(productPreview)}>
+                            <div className="flex-1 text-center cursor-pointer" onClick={() => pipeline.setRefLightboxSrc(productPreview)}>
                                 <img src={productPreview} alt="Fiche technique"
                                     className="w-full aspect-square object-contain rounded-md bg-white hover:ring-2 hover:ring-primary transition-all" />
                                 <p className="text-xs text-muted-foreground mt-1">Structure 🔍</p>
                             </div>
-                            <div className="flex-1 text-center cursor-pointer" onClick={() => setRefLightboxSrc(fabricPreview)}>
+                            <div className="flex-1 text-center cursor-pointer" onClick={() => pipeline.setRefLightboxSrc(fabricPreview)}>
                                 <img src={fabricPreview} alt="Tissu"
                                     className="w-full aspect-square object-contain rounded-md bg-white hover:ring-2 hover:ring-primary transition-all" />
                                 <p className="text-xs text-muted-foreground mt-1">Matière 🔍</p>
                             </div>
                         </div>
 
-                        {/* Controls — only before first generation */}
                         {!generatedImages.length && !loading && (
-                            <div className="space-y-4">
-                                <div className="flex items-center gap-4">
-                                    <label className="text-sm font-medium min-w-fit">Variantes</label>
-                                    <input type="range" min={1} max={6} value={variantCount}
-                                        onChange={(e) => setVariantCount(Number(e.target.value))}
-                                        className="flex-1 accent-primary" />
-                                    <span className="text-lg font-bold min-w-[2ch] text-center">{variantCount}</span>
-                                </div>
-                                <div className="flex items-center gap-4">
-                                    <label className="text-sm font-medium min-w-fit">Résolution</label>
-                                    <div className="flex gap-2 flex-1">
-                                        {["1K", "2K", "4K"].map((r) => (
-                                            <button key={r} onClick={() => setResolution(r)}
-                                                className={`flex-1 py-1.5 px-3 rounded-md text-sm font-medium border transition-all ${resolution === r ? "bg-primary text-primary-foreground border-primary" : "hover:bg-accent border-input"}`}>
-                                                {r}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-4">
-                                    <label className="text-sm font-medium min-w-fit">Ratio</label>
-                                    <div className="flex gap-2 flex-1 flex-wrap">
-                                        {["1:1", "4:3", "3:4", "16:9", "9:16"].map((r) => (
-                                            <button key={r} onClick={() => setAspectRatio(r)}
-                                                className={`py-1.5 px-3 rounded-md text-sm font-medium border transition-all ${aspectRatio === r ? "bg-primary text-primary-foreground border-primary" : "hover:bg-accent border-input"}`}>
-                                                {r}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                                <Button onClick={() => handleGenerate(MODELS.FLASH)} className="w-full">
-                                    ⚡ Générer {variantCount} visualisation{variantCount > 1 ? "s" : ""} 3D ({resolution}, {aspectRatio})
-                                </Button>
-                                <p className="text-xs text-muted-foreground text-center">Aperçu rapide via Flash — utilisez Régénérer pour la qualité Pro</p>
-                            </div>
+                            <GenerationControls
+                                variantCount={variantCount} setVariantCount={setVariantCount}
+                                resolution={resolution} setResolution={setResolution}
+                                aspectRatio={aspectRatio} setAspectRatio={setAspectRatio}
+                                activePreset={activePreset} applyPreset={applyPreset} clearPreset={clearPreset}
+                                productNotes={productNotes} setProductNotes={setProductNotes}
+                                notesPlaceholder="Ex: Le tissu doit envelopper le produit de manière réaliste. Les coutures doivent être visibles."
+                                generateLabel="visualisation 3D"
+                                onGenerate={handleGenerate}
+                            />
                         )}
 
-                        {/* Image grid — progressive loading */}
-                        {(generatedImages.length > 0 || loading) && (
-                            <div className="space-y-3">
-                                {filledCount > 0 && (
-                                    <div className="flex items-center justify-between">
-                                        <button onClick={toggleSelectAll} className="text-sm text-primary hover:underline">
-                                            {selectedImages.size === filledCount ? "Tout désélectionner" : "Tout sélectionner"}
-                                        </button>
-                                        <span className="text-sm text-muted-foreground">{selectedImages.size} sélectionnée{selectedImages.size > 1 ? "s" : ""}</span>
-                                    </div>
-                                )}
-                                <div className="grid grid-cols-2 gap-4">
-                                    {generatedImages.map((img, i) => (
-                                        <div key={i}
-                                            className={`relative rounded-lg border overflow-hidden transition-all ${img ? "cursor-pointer hover:shadow-lg" : "animate-pulse"} ${img && selectedImages.has(i) ? "ring-2 ring-primary ring-offset-2" : ""}`}>
-                                            {img ? (
-                                                <>
-                                                    <img src={`data:image/png;base64,${img}`} alt={`Variante ${i + 1}`}
-                                                        className="w-full aspect-square object-contain bg-white"
-                                                        onClick={() => setLightboxIdx(i)} />
-                                                    <button onClick={(e) => { e.stopPropagation(); toggleSelect(i); }}
-                                                        className={`absolute top-2 left-2 w-6 h-6 rounded border-2 flex items-center justify-center text-xs font-bold transition-all ${selectedImages.has(i) ? "bg-primary border-primary text-primary-foreground" : "bg-white/80 border-gray-300 hover:border-primary"}`}>
-                                                        {selectedImages.has(i) && "✓"}
-                                                    </button>
-                                                    <button onClick={(e) => { e.stopPropagation(); downloadImage(img, getFileName(i)); }}
-                                                        className="absolute top-2 right-2 w-8 h-8 rounded-full bg-white/80 hover:bg-white flex items-center justify-center text-sm shadow transition-all hover:scale-110"
-                                                        title="Télécharger">⬇</button>
-                                                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/40 to-transparent p-3">
-                                                        <span className="text-white text-sm font-medium">Variante {i + 1}</span>
-                                                    </div>
-                                                </>
-                                            ) : (
-                                                <div className="aspect-square bg-muted flex items-center justify-center">
-                                                    <div className="text-center">
-                                                        <div className="animate-spin text-2xl mb-2">⏳</div>
-                                                        <p className="text-sm text-muted-foreground">Génération...</p>
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
-                        {filledCount > 0 && !loading && (
-                            <div className="flex gap-2">
-                                <Button variant="outline" onClick={() => handleGenerate(MODELS.FLASH)}>⚡ Régénérer (Flash)</Button>
-                                <Button variant="outline" onClick={() => handleGenerate(MODELS.PRO)}>🔄 Régénérer (Pro)</Button>
-                            </div>
-                        )}
+                        <ImageGrid
+                            generatedImages={generatedImages} selectedImages={selectedImages} filledCount={filledCount}
+                            editingIdx={editingIdx} setEditingIdx={setEditingIdx}
+                            editPrompt={editPrompt} setEditPrompt={setEditPrompt}
+                            editLoading={editLoading} error={error} loading={loading}
+                            setLightboxIdx={setLightboxIdx}
+                            toggleSelect={toggleSelect} toggleSelectAll={toggleSelectAll}
+                            handleEditImage={handleEditImage}
+                            onDownload={(i) => downloadImage(generatedImages[i], pipeline.getFileName(i))}
+                            onGenerate={handleGenerate}
+                            onExport={() => setStep(3)}
+                        />
 
                         <Button variant="outline" onClick={() => setStep(1)} className="w-full">← Retour</Button>
+                    </CardContent>
+                </Card>
+            )}
+
+            {/* Step 3: Export */}
+            {step === 3 && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Export & téléchargement</CardTitle>
+                        <p className="text-sm text-muted-foreground">
+                            {selectedImages.size > 0
+                                ? `${selectedImages.size} image${selectedImages.size > 1 ? "s" : ""} sélectionnée${selectedImages.size > 1 ? "s" : ""} — cliquez pour dé/sélectionner`
+                                : `${filledCount} image${filledCount > 1 ? "s" : ""} — tout sera téléchargé. Cliquez pour en sélectionner.`}
+                        </p>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                            {generatedImages.map((img, idx) => img && (
+                                <div key={idx} onClick={() => toggleSelect(idx)}
+                                    className={`relative text-center cursor-pointer rounded-lg border-2 overflow-hidden transition-all hover:shadow-lg ${selectedImages.has(idx) ? "border-primary ring-2 ring-primary ring-offset-2" : "border-transparent"}`}>
+                                    <img src={`data:image/png;base64,${img}`} alt={`Variante ${idx + 1}`}
+                                        className="w-full aspect-square object-contain bg-white" />
+                                    <div className={`absolute top-2 left-2 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shadow transition-all ${selectedImages.has(idx) ? "bg-primary text-primary-foreground" : "bg-white/80 text-muted-foreground"}`}>
+                                        {selectedImages.has(idx) ? "✓" : idx + 1}
+                                    </div>
+                                    <button onClick={(e) => { e.stopPropagation(); setLightboxIdx(idx); }}
+                                        className="absolute top-2 right-2 w-6 h-6 rounded-full bg-white/80 hover:bg-white flex items-center justify-center text-xs shadow"
+                                        title="Agrandir">🔍</button>
+                                    <div className="bg-muted/80 py-1 px-2">
+                                        <p className="text-xs font-medium">Variante {idx + 1}</p>
+                                        <p className="text-[10px] text-muted-foreground">
+                                            {imageDims[idx] ? `${imageDims[idx].w}×${imageDims[idx].h}px` : "…"}
+                                        </p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="flex justify-between items-center">
+                            <button onClick={toggleSelectAll} className="text-sm text-primary hover:underline">
+                                {selectedImages.size === filledCount ? "Tout désélectionner" : "Tout sélectionner"}
+                            </button>
+                            <span className="text-xs text-muted-foreground">
+                                {selectedImages.size > 0 ? `${selectedImages.size} sélectionnée${selectedImages.size > 1 ? "s" : ""}` : "Toutes (aucune sélection)"}
+                            </span>
+                        </div>
+
+                        <ExportPanel
+                            pipeline={pipeline}
+                            generatedImages={generatedImages}
+                            loading={loading}
+                            filledCount={filledCount}
+                            selectedImages={selectedImages}
+                        />
+
+                        <Button variant="outline" onClick={() => setStep(2)} className="w-full">← Retour</Button>
                     </CardContent>
                 </Card>
             )}
@@ -236,15 +240,15 @@ export default function ThreeDProduitPage() {
                 imageDims={imageDims}
                 lightboxIdx={lightboxIdx}
                 setLightboxIdx={setLightboxIdx}
-                onDownload={(idx) => downloadImage(generatedImages[idx], getFileName(idx))}
+                onDownload={(idx) => downloadImage(generatedImages[idx], pipeline.getFileName(idx))}
                 selectedImages={selectedImages}
                 toggleSelect={toggleSelect}
             />
 
             {/* Reference lightbox */}
             <SimpleLightbox
-                src={refLightboxSrc}
-                onClose={() => setRefLightboxSrc(null)}
+                src={pipeline.refLightboxSrc}
+                onClose={() => pipeline.setRefLightboxSrc(null)}
             />
         </div>
     );

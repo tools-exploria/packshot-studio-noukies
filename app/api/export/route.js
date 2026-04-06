@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import sharp from "sharp";
 
-// Resize & export images (format is optional — omit to keep native size)
+// Resize & export images
+// Query params: format (WxH), background (white|transparent), output (png|jpg)
 export async function POST(request) {
     try {
         const body = await request.json();
-        const { images, format, background = "white" } = body;
+        const { images, format, background = "white", output = "png" } = body;
 
         if (!images || !images.length) {
             return NextResponse.json({ error: "No images provided" }, { status: 400 });
@@ -30,19 +31,24 @@ export async function POST(request) {
             let pipeline = sharp(buffer);
 
             if (targetW && targetH) {
-                pipeline = pipeline.resize(targetW, targetH, { fit: "contain", background: bg });
+                pipeline = pipeline.resize(targetW, targetH, { fit: "cover", position: "centre" });
             }
 
-            // Flatten onto background (composites transparent onto white/colored bg)
-            if (background !== "transparent") {
+            // JPG or non-transparent: flatten onto white background
+            if (output === "jpg" || background !== "transparent") {
                 pipeline = pipeline.flatten({ background: { r: 255, g: 255, b: 255 } });
             }
 
-            const resized = await pipeline.png().toBuffer();
-            results.push(resized.toString("base64"));
+            if (output === "jpg") {
+                const result = await pipeline.jpeg({ quality: 95 }).toBuffer();
+                results.push(result.toString("base64"));
+            } else {
+                const result = await pipeline.png().toBuffer();
+                results.push(result.toString("base64"));
+            }
         }
 
-        return NextResponse.json({ results, format: format || "native", count: results.length });
+        return NextResponse.json({ results, format: format || "native", output, count: results.length });
     } catch (err) {
         return NextResponse.json({ error: err.message }, { status: 500 });
     }

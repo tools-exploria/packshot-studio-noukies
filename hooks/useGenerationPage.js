@@ -11,6 +11,25 @@ import { useState, useCallback } from "react";
 import { fileToBase64, generateImages, MODELS } from "@/lib/api";
 
 /**
+ * Generation presets — pre-configured resolution + aspect ratio combos
+ * that match specific client requirements.
+ *
+ * Each preset generates slightly above the target dimensions, so the final
+ * crop/resize at export time is minimal (downscale only, no upscale).
+ *
+ * Will eventually be driven by the brand config page instead of hardcoded.
+ */
+export const GENERATION_PRESETS = {
+    "noukies-packshot": {
+        label: "Noukies Packshot",
+        description: "Génère en 2K 4:5 (~1664x2048), à exporter en 1560x2000",
+        resolution: "2K",
+        aspectRatio: "4:5",
+        exportSize: "1560x2000",
+    },
+};
+
+/**
  * @param {object} opts
  * @param {number}  [opts.defaultVariantCount=4]   - Initial number of variants
  * @param {string}  [opts.defaultResolution="2K"]   - Initial resolution
@@ -33,6 +52,19 @@ export function useGenerationPage({
     const [resolution, setResolution] = useState(defaultResolution);
     const [aspectRatio, setAspectRatio] = useState(defaultAspectRatio);
     const [productNotes, setProductNotes] = useState("");
+    const [activePreset, setActivePreset] = useState(null);
+
+    /** Apply a generation preset (sets resolution + aspectRatio in one click). */
+    const applyPreset = useCallback((presetKey) => {
+        const preset = GENERATION_PRESETS[presetKey];
+        if (!preset) return;
+        setResolution(preset.resolution);
+        setAspectRatio(preset.aspectRatio);
+        setActivePreset(presetKey);
+    }, []);
+
+    /** Clear any active preset (when user manually changes resolution or ratio). */
+    const clearPreset = useCallback(() => setActivePreset(null), []);
 
     // ── Product file ─────────────────────────────────────────────
     const [productFile, setProductFile] = useState(null);
@@ -202,6 +234,7 @@ export function useGenerationPage({
         variantCount, setVariantCount,
         resolution, setResolution,
         aspectRatio, setAspectRatio,
+        activePreset, applyPreset, clearPreset,
         productNotes, setProductNotes,
         productFile, setProductFile,
         productPreview, setProductPreview,

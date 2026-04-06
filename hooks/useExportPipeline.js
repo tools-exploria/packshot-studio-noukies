@@ -1,7 +1,17 @@
 "use client";
 import { useState } from "react";
-import { downloadImage, MODELS } from "@/lib/api";
+import { MODELS } from "@/lib/api";
 import { PROMPTS } from "@/lib/prompts";
+
+/** Trigger a browser download from a base64 string. Infers MIME from extension. */
+function downloadB64(b64, filename) {
+    const ext = filename.split(".").pop().toLowerCase();
+    const mime = ext === "jpg" || ext === "jpeg" ? "image/jpeg" : "image/png";
+    const a = document.createElement("a");
+    a.href = `data:${mime};base64,${b64}`;
+    a.download = filename;
+    a.click();
+}
 
 /**
  * Shared hook for export pipeline: green screen, chroma key, file naming, PNG/PDF export.
@@ -167,8 +177,37 @@ export function useExportPipeline({ generatedImages, imageDims, resolution, aspe
         try {
             const images = await getExportImages(indices);
             for (let n = 0; n < images.length; n++) {
-                downloadImage(images[n].b64, getFileName(images[n].index));
+                downloadB64(images[n].b64, getFileName(images[n].index, "png"));
                 if (n < images.length - 1) await new Promise((r) => setTimeout(r, 300));
+            }
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Export as JPG (white background, optional resize to 1560x2000)
+    const handleExportJPG = async () => {
+        const indices = getExportIndices();
+        if (!indices.length) { setError("Aucune image à télécharger"); return; }
+        setLoading(true);
+        setError(null);
+        try {
+            const images = await getExportImages(indices);
+            const b64List = images.map((img) => img.b64);
+            const body = { images: b64List, output: "jpg", background: "white" };
+            if (exportSize && exportSize.includes("x")) body.format = exportSize;
+            const res = await fetch("/api/export", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(body),
+            });
+            const data = await res.json();
+            if (!data.results?.length) { setError("Export JPG échoué"); return; }
+            for (let n = 0; n < data.results.length; n++) {
+                downloadB64(data.results[n], getFileName(images[n].index, "jpg"));
+                if (n < data.results.length - 1) await new Promise((r) => setTimeout(r, 300));
             }
         } catch (err) {
             setError(err.message);
@@ -219,6 +258,6 @@ export function useExportPipeline({ generatedImages, imageDims, resolution, aspe
         refLightboxSrc, setRefLightboxSrc,
         generateGreenScreen, generateAllGreenScreens,
         getExportImages, getFileName, getExportIndices,
-        handleExport, handleExportPDF,
+        handleExport, handleExportJPG, handleExportPDF,
     };
 }
