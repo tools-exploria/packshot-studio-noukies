@@ -21,6 +21,15 @@ const MODES = [
     iconBg: "bg-[#2d4a9e]/10",
   },
   {
+    title: "Angles alternatifs",
+    description: "Générez des vues alternatives de votre packshot validé : face, 3/4, dos, flat-lay, détail macro.",
+    href: "/angles",
+    icon: "📐",
+    badge: "4 étapes",
+    accent: "border-l-[#7986cb]",
+    iconBg: "bg-[#7986cb]/10",
+  },
+  {
     title: "Photo d'ambiance",
     description: "Mettez votre produit en situation de vie : bébé, nursery, parent, lifestyle. Templates prédéfinis ou scène personnalisée.",
     href: "/ambiance",
