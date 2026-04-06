@@ -22,6 +22,7 @@ const ANGLE_OPTIONS = [
     { key: "3/4-dos", label: "3/4 Dos", desc: "45° arrière-droit" },
     { key: "dos", label: "Dos", desc: "Vue arrière, fermetures" },
     { key: "flat-lay", label: "Flat Lay", desc: "Vue du dessus, produit à plat" },
+    { key: "bottom", label: "Dessous", desc: "Vue du dessous, semelle / base" },
     { key: "detail-macro", label: "Détail Macro", desc: "Gros plan texture, coutures, broderie" },
 ];
 
@@ -31,6 +32,7 @@ const VIEW_LABELS = [
     { value: "back view", label: "Vue de dos" },
     { value: "three-quarter view", label: "Vue 3/4" },
     { value: "top-down view", label: "Vue du dessus" },
+    { value: "bottom view", label: "Vue du dessous" },
     { value: "detail / close-up", label: "Détail / gros plan" },
 ];
 
