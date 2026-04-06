@@ -26,12 +26,12 @@ const ANGLE_OPTIONS = [
 ];
 
 const VIEW_LABELS = [
-    "front view",
-    "side view",
-    "back view",
-    "three-quarter view",
-    "top-down view",
-    "detail / close-up",
+    { value: "front view", label: "Vue de face" },
+    { value: "side view", label: "Vue de profil" },
+    { value: "back view", label: "Vue de dos" },
+    { value: "three-quarter view", label: "Vue 3/4" },
+    { value: "top-down view", label: "Vue du dessus" },
+    { value: "detail / close-up", label: "Détail / gros plan" },
 ];
 
 const REF_ROLES = [
@@ -173,7 +173,7 @@ export default function AnglesPage() {
                                             >
                                                 <option value="">Type de vue...</option>
                                                 {VIEW_LABELS.map((l) => (
-                                                    <option key={l} value={l}>{l}</option>
+                                                    <option key={l.value} value={l.value}>{l.label}</option>
                                                 ))}
                                             </select>
                                             {ref.role === "structure" && (

@@ -24,7 +24,7 @@ const MODES = [
     title: "Broderie",
     description: "Appliquez un motif brodé sur votre produit. Upload packshot + design broderie, choix du placement, rendu réaliste.",
     href: "/broderie",
-    icon: "🪡",
+    icon: "🧵",
     badge: "5 étapes",
     accent: "border-l-[#e8a87c]",
     iconBg: "bg-[#e8a87c]/10",

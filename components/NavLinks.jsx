@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 const NAV_LINKS = [
     { href: "/pattern", label: "Motif", icon: "🎨" },
     { href: "/couleur", label: "Couleur", icon: "🖌️" },
-    { href: "/broderie", label: "Broderie", icon: "🪡" },
+    { href: "/broderie", label: "Broderie", icon: "🧵" },
     { href: "/angles", label: "Angles", icon: "📐" },
     { href: "/ambiance", label: "Ambiance", icon: "📸" },
     { href: "/3d-produit", label: "3D Produit", icon: "🧸" },
