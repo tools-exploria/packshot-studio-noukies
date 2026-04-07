@@ -52,7 +52,7 @@ const MODES = [
     description: "Générez une visualisation 3D haute-fidélité d'un produit à partir de sa fiche technique et d'un échantillon de tissu.",
     href: "/3d-produit",
     icon: "🧸",
-    badge: "Demo",
+    badge: "4 étapes",
     accent: "border-l-[#ce93d8]",
     iconBg: "bg-[#ce93d8]/20",
   },
