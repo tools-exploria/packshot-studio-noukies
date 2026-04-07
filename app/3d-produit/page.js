@@ -61,7 +61,8 @@ export default function ThreeDProduitPage() {
     // 3D generation uses a 180s timeout (heavier rendering)
     const handleGenerate = async (model = MODELS.FLASH) => {
         if (!productFile || !fabricFile) return;
-        await runGenerate(PROMPTS.product3D, [productFile, fabricFile], model, 180_000);
+        const prompt = PROMPTS.product3D(productNotes.trim() || "");
+        await runGenerate(prompt, [productFile, fabricFile], model, 180_000);
     };
 
     return (
