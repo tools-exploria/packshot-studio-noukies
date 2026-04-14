@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Stepper, UploadZone } from "@/components/shared";
-import { PROMPTS, SCENE_LABELS, STRUCTURED_SCENE_LABELS } from "@/lib/prompts";
+import { PROMPTS, SCENE_LABELS } from "@/lib/prompts";
 import { downloadImage, MODELS } from "@/lib/api";
 import { useExportPipeline } from "@/hooks/useExportPipeline";
 import { ExportPanel } from "@/components/ExportPanel";
@@ -24,9 +24,9 @@ const PLACEMENT_OPTIONS = [
 ];
 
 const BABY_AGE_OPTIONS = [
-    { value: "newborn", label: "Nouveau-né (0-1 mois)" },
-    { value: "3-6-months", label: "3-6 mois" },
-    { value: "6-12-months", label: "6-12 mois" },
+    { value: "0-3-months", label: "0-3 mois (couché)" },
+    { value: "6-12-months", label: "6-12 mois (assis)" },
+    { value: "2-3-years", label: "2-3 ans (debout)" },
 ];
 
 const OUTDOOR_TYPE_OPTIONS = [
@@ -64,12 +64,12 @@ export default function AmbiancePage() {
     } = useGenerationPage();
 
     // ── Ambiance-specific state ──────────────────────────────────
-    const [sceneType, setSceneType] = useState("baby_sitting");
+    const [sceneType, setSceneType] = useState("baby_scene");
     const [customPrompt, setCustomPrompt] = useState("");
 
     // New structured scene controls
     const [productPlacement, setProductPlacement] = useState("on the bed");
-    const [babyAge, setBabyAge] = useState("3-6-months");
+    const [babyAge, setBabyAge] = useState("0-3-months");
     const [outdoorType, setOutdoorType] = useState("garden");
     const [sceneMood, setSceneMood] = useState("");
 
@@ -81,7 +81,6 @@ export default function AmbiancePage() {
     const getSceneLabel = () => {
         if (sceneType === "custom") return "Prompt personnalisé";
         if (SCENE_LABELS[sceneType]) return SCENE_LABELS[sceneType];
-        if (STRUCTURED_SCENE_LABELS[sceneType]) return STRUCTURED_SCENE_LABELS[sceneType];
         return sceneType;
     };
 
@@ -98,14 +97,12 @@ export default function AmbiancePage() {
             prompt = PROMPTS.babyScene(babyAge, sceneMood.trim() || "", productNotes.trim() || "");
         } else if (sceneType === "outdoor_scene") {
             prompt = PROMPTS.outdoorScene(outdoorType, sceneMood.trim() || "", productNotes.trim() || "");
-        } else {
-            prompt = PROMPTS.ambiance[sceneType];
         }
 
         if (!prompt) { setError("Prompt vide"); return; }
 
-        // Append notes for legacy presets and custom (structured scenes handle notes internally)
-        if (!["nursery_scene", "baby_scene", "outdoor_scene"].includes(sceneType) && productNotes.trim()) {
+        // Append notes for custom prompts (structured scenes handle notes internally)
+        if (sceneType === "custom" && productNotes.trim()) {
             prompt += `\n\nAdditional product notes: ${productNotes.trim()}`;
         }
 
@@ -114,6 +111,18 @@ export default function AmbiancePage() {
 
     return (
         <div className="max-w-4xl mx-auto px-6 py-8">
+            {/* Ambiance tabs */}
+            <div className="flex items-center gap-3 mb-6">
+                <a href="/ambiance"
+                    className="px-3 py-1.5 text-sm font-semibold rounded-lg bg-primary/10 text-primary">
+                    Scène produit
+                </a>
+                <a href="/ambiance/room-scene"
+                    className="px-3 py-1.5 text-sm font-medium rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors">
+                    Scène chambre
+                </a>
+            </div>
+
             <Stepper steps={STEPS} currentStep={step} />
 
             {error && (
@@ -146,32 +155,12 @@ export default function AmbiancePage() {
                         <p className="text-sm text-muted-foreground">Choisissez un template ou écrivez un prompt personnalisé.</p>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        {/* Legacy presets */}
-                        <div>
-                            <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">Templates rapides</p>
-                            <div className="grid grid-cols-1 gap-2">
-                                {Object.entries(SCENE_LABELS).map(([key, label]) => (
-                                    <button key={key} onClick={() => setSceneType(key)}
-                                        className={`text-left p-3 rounded-lg border transition-all ${sceneType === key ? "border-primary bg-primary/5 shadow-sm" : "hover:border-primary/30 hover:bg-accent/50"}`}>
-                                        <span className="font-medium text-sm">{label}</span>
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Divider */}
-                        <div className="relative">
-                            <div className="absolute inset-0 flex items-center"><div className="w-full border-t" /></div>
-                            <div className="relative flex justify-center"><span className="bg-card px-3 text-xs text-muted-foreground">Scènes avancées</span></div>
-                        </div>
-
-                        {/* New structured scenes */}
+                        {/* Scene types */}
                         <div className="grid grid-cols-1 gap-2">
-                            {Object.entries(STRUCTURED_SCENE_LABELS).map(([key, label]) => (
+                            {Object.entries(SCENE_LABELS).filter(([key]) => key !== "room_scene").map(([key, label]) => (
                                 <button key={key} onClick={() => setSceneType(key)}
                                     className={`text-left p-3 rounded-lg border transition-all ${sceneType === key ? "border-primary bg-primary/5 shadow-sm" : "hover:border-primary/30 hover:bg-accent/50"}`}>
                                     <span className="font-medium text-sm">{label}</span>
-                                    {key === "baby_scene" && <span className="text-xs text-muted-foreground ml-2">— anti uncanny valley</span>}
                                 </button>
                             ))}
                         </div>
@@ -246,7 +235,7 @@ export default function AmbiancePage() {
                         {/* Custom prompt */}
                         <button onClick={() => setSceneType("custom")}
                             className={`w-full text-left p-3 rounded-lg border transition-all ${sceneType === "custom" ? "border-primary bg-primary/5 shadow-sm" : "hover:border-primary/30 hover:bg-accent/50"}`}>
-                            <span className="font-medium text-sm">✏️ Prompt personnalisé</span>
+                            <span className="font-medium text-sm">Prompt personnalisé</span>
                         </button>
 
                         {sceneType === "custom" && (
@@ -283,7 +272,7 @@ export default function AmbiancePage() {
                         <div className="flex gap-3 p-3 rounded-lg bg-muted/50 border border-dashed">
                             <div className="flex-1 text-center cursor-pointer" onClick={() => pipeline.setRefLightboxSrc(productPreview)}>
                                 <img src={productPreview} alt="Produit" className="w-full aspect-square object-contain rounded-md bg-white hover:ring-2 hover:ring-primary transition-all" />
-                                <p className="text-xs text-muted-foreground mt-1">Produit 🔍</p>
+                                <p className="text-xs text-muted-foreground mt-1">Produit</p>
                             </div>
                             <div className="flex-1 flex flex-col items-center justify-center">
                                 <p className="text-sm font-medium text-center">{getSceneLabel()}</p>
@@ -324,6 +313,10 @@ export default function AmbiancePage() {
                             onGenerate={handleGenerate}
                             onExport={() => setStep(3)}
                         />
+
+                        {!loading && !generatedImages.length && (
+                            <Button variant="outline" onClick={() => setStep(1)} className="w-full">← Retour</Button>
+                        )}
                     </CardContent>
                 </Card>
             )}

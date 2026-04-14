@@ -84,6 +84,10 @@ export default function LaboPage() {
                     className="px-3 py-1.5 text-sm font-medium rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors">
                     Sketch → Packshot
                 </a>
+                <a href="/labo/pliage"
+                    className="px-3 py-1.5 text-sm font-medium rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors">
+                    Pliage
+                </a>
             </div>
 
             <Stepper steps={STEPS} currentStep={step} />

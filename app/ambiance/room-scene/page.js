@@ -2,6 +2,7 @@
 import { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
 import { Stepper, UploadZone } from "@/components/shared";
 import { fileToBase64, downloadImage, MODELS } from "@/lib/api";
 import { useExportPipeline } from "@/hooks/useExportPipeline";
@@ -13,91 +14,18 @@ import { useGenerationPage } from "@/hooks/useGenerationPage";
 import { PROMPTS } from "@/lib/prompts";
 import { IMAGE_ROLES, buildLegacyPayload } from "@/lib/interleaved";
 
-const STEPS = ["Images", "Generation", "Export"];
+const STEPS = ["Produits", "Génération", "Export"];
 
-// Roles for base images (define the product)
-const BASE_ROLE_OPTIONS = [
-    { value: "sketch",    label: "Croquis / Dessin" },
-    { value: "photo",     label: "Photo smartphone" },
-    { value: "product",   label: "Packshot existant" },
+const PRODUCT_PLACEHOLDERS = [
+    "Ex: Mobile musical avec oursons et étoiles, à suspendre au-dessus du berceau",
+    "Ex: Pyjama velours bleu ciel, à plier sur l'étagère ou draper sur la chaise",
+    "Ex: Gigoteuse en jersey gris avec broderie lapin, à poser dans le berceau",
+    "Ex: Peluche ours brun en velours, à placer assis sur l'étagère à côté des livres",
+    "Ex: Doudou lapin blanc en coton, à poser sur le lit ou dans le berceau",
+    "Ex: Coussin nuage en lin beige, à disposer sur le fauteuil ou dans le lit",
 ];
 
-// ── Reusable card for a base image (with role selector) ─────
-function BaseImageCard({ input, index, onUpdateRole, onUpdateDesc, onRemove }) {
-    const role = IMAGE_ROLES[input.role];
-    return (
-        <div className="flex gap-3 items-start p-3 rounded-lg border bg-muted/30">
-            <div className="flex-shrink-0 relative">
-                <img src={input.preview} alt={`Base ${index + 1}`}
-                    className="w-24 h-24 object-contain rounded-md bg-white border" />
-                <span className="absolute -top-2 -left-2 w-5 h-5 rounded-full bg-primary text-primary-foreground text-[10px] flex items-center justify-center font-bold shadow">
-                    {index + 1}
-                </span>
-            </div>
-            <div className="flex-1 space-y-2 min-w-0">
-                <div className="flex items-center gap-2">
-                    <select
-                        value={input.role}
-                        onChange={(e) => onUpdateRole(e.target.value)}
-                        className="rounded-md border border-input bg-background px-2 py-1.5 text-sm font-medium"
-                    >
-                        {BASE_ROLE_OPTIONS.map((opt) => (
-                            <option key={opt.value} value={opt.value}>{opt.label}</option>
-                        ))}
-                    </select>
-                    <button onClick={onRemove}
-                        className="text-destructive hover:text-destructive/80 text-xs font-medium ml-auto">
-                        Supprimer
-                    </button>
-                </div>
-                <input
-                    type="text"
-                    value={input.description}
-                    onChange={(e) => onUpdateDesc(e.target.value)}
-                    placeholder="Decrivez cette image pour aider le modele..."
-                    className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                />
-                <p className="text-[10px] text-muted-foreground leading-tight">
-                    {role?.extract && <>Extraira : {role.extract}</>}
-                    {role?.ignore && <> — Ignorera : {role.ignore}</>}
-                </p>
-            </div>
-        </div>
-    );
-}
-
-// ── Reusable card for a reference product (no role selector) ─
-function RefProductCard({ input, index, onUpdateDesc, onRemove }) {
-    return (
-        <div className="flex gap-3 items-start p-3 rounded-lg border bg-muted/30">
-            <div className="flex-shrink-0 relative">
-                <img src={input.preview} alt={`Ref ${index + 1}`}
-                    className="w-24 h-24 object-contain rounded-md bg-white border" />
-                <span className="absolute -top-2 -left-2 w-5 h-5 rounded-full bg-muted-foreground text-white text-[10px] flex items-center justify-center font-bold shadow">
-                    R{index + 1}
-                </span>
-            </div>
-            <div className="flex-1 space-y-2 min-w-0">
-                <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-muted-foreground">Produit existant</span>
-                    <button onClick={onRemove}
-                        className="text-destructive hover:text-destructive/80 text-xs font-medium ml-auto">
-                        Supprimer
-                    </button>
-                </div>
-                <input
-                    type="text"
-                    value={input.description}
-                    onChange={(e) => onUpdateDesc(e.target.value)}
-                    placeholder={"Que reprendre de ce produit ? Ex: la matiere velours vert, le zip dore..."}
-                    className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                />
-            </div>
-        </div>
-    );
-}
-
-export default function SketchToPackshotPage() {
+export default function RoomScenePage() {
     const [step, setStep] = useState(0);
 
     const {
@@ -120,30 +48,29 @@ export default function SketchToPackshotPage() {
         toggleSelectAll,
     } = useGenerationPage();
 
-    // ── Base images (define the product — at least 1 required) ──
-    const [baseInputs, setBaseInputs] = useState([]);
+    // ── Mood (optional) ──────────────────────────────────────
+    const [sceneMood, setSceneMood] = useState("");
 
-    // ── Reference images (optional — enrich generation) ──────────
-    const [refInputs, setRefInputs] = useState([]);
+    // ── Products to place in the room (1+, required) ─────────
+    const [productInputs, setProductInputs] = useState([]);
 
-    // ── Helpers ──────────────────────────────────────────────────
-    const addImage = useCallback((f, list, setList, defaultRole) => {
+    const handleProductUpload = useCallback((f) => {
         const reader = new FileReader();
         reader.onload = (e) => {
-            setList((prev) => [
+            setProductInputs((prev) => [
                 ...prev,
-                { file: f, preview: e.target.result, role: defaultRole, description: "" },
+                { file: f, preview: e.target.result, role: "roomProduct", description: "" },
             ]);
         };
         reader.readAsDataURL(f);
     }, []);
 
-    const updateField = useCallback((setList, idx, field, value) => {
-        setList((prev) => prev.map((inp, i) => (i === idx ? { ...inp, [field]: value } : inp)));
+    const updateProductDesc = useCallback((idx, description) => {
+        setProductInputs((prev) => prev.map((inp, i) => (i === idx ? { ...inp, description } : inp)));
     }, []);
 
-    const removeFrom = useCallback((setList, idx) => {
-        setList((prev) => prev.filter((_, i) => i !== idx));
+    const removeProduct = useCallback((idx) => {
+        setProductInputs((prev) => prev.filter((_, i) => i !== idx));
     }, []);
 
     const pipeline = useExportPipeline({
@@ -154,22 +81,21 @@ export default function SketchToPackshotPage() {
 
     // ── Generation handler ────────────────────────────────────
     const handleGenerate = async (model = MODELS.FLASH) => {
-        if (!baseInputs.length) return;
+        if (!productInputs.length) return;
 
         try {
-            const allInputs = [...baseInputs, ...refInputs];
-            const base64Data = await Promise.all(allInputs.map((inp) => fileToBase64(inp.file)));
+            const base64Data = await Promise.all(productInputs.map((inp) => fileToBase64(inp.file)));
 
-            const inputs = allInputs.map((inp, i) => ({
+            const inputs = productInputs.map((inp, i) => ({
                 role: inp.role,
                 data: base64Data[i],
                 description: inp.description || undefined,
             }));
 
-            const instruction = PROMPTS.sketchToPackshot(productNotes.trim());
+            const instruction = PROMPTS.roomScene(productInputs.length, sceneMood.trim() || "", productNotes.trim());
             const legacy = buildLegacyPayload(inputs, instruction);
 
-            const files = allInputs.map((inp) => inp.file);
+            const files = productInputs.map((inp) => inp.file);
             await runGenerate(legacy.prompt, files, model);
         } catch (err) {
             setError(err.message);
@@ -177,50 +103,33 @@ export default function SketchToPackshotPage() {
     };
 
     // ── Can proceed? ──────────────────────────────────────────
-    const canGenerate = baseInputs.length > 0;
+    const canGenerate = productInputs.length > 0;
 
     // ── Previews for reference strip ──────────────────────────
-    const allInputs = [...baseInputs, ...refInputs];
-    const allPreviews = allInputs.map((inp) => ({
+    const allPreviews = productInputs.map((inp, i) => ({
         preview: inp.preview,
-        label: IMAGE_ROLES[inp.role]?.label || inp.role,
+        label: inp.description || `Produit ${i + 1}`,
     }));
 
     return (
         <div className="max-w-4xl mx-auto px-6 py-8">
-            {/* Labo experiments nav */}
+            {/* Ambiance tabs */}
             <div className="flex items-center gap-3 mb-6">
-                <a href="/labo"
+                <a href="/ambiance"
                     className="px-3 py-1.5 text-sm font-medium rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors">
-                    Prompt libre
+                    Scène produit
                 </a>
-                <a href="/labo/sketch-to-packshot"
+                <a href="/ambiance/room-scene"
                     className="px-3 py-1.5 text-sm font-semibold rounded-lg bg-primary/10 text-primary">
-                    Sketch → Packshot
-                </a>
-                <a href="/labo/pliage"
-                    className="px-3 py-1.5 text-sm font-medium rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors">
-                    Pliage
+                    Scène chambre
                 </a>
             </div>
 
             <div className="mb-6">
-                <h1 className="text-2xl font-bold">Sketch → Packshot</h1>
+                <h1 className="text-2xl font-bold">Scène chambre multi-produits</h1>
                 <p className="text-sm text-muted-foreground mt-1">
-                    Genere un packshot professionnel a partir d'un croquis, d'une photo smartphone ou d'un packshot existant.
+                    Placez plusieurs produits Noukies dans une chambre bébé stylée pour générer une photo d'ambiance grand angle.
                 </p>
-                <details className="mt-3 text-sm">
-                    <summary className="cursor-pointer font-medium text-muted-foreground hover:text-foreground">
-                        Comment bien utiliser cet outil ?
-                    </summary>
-                    <div className="mt-2 p-4 rounded-lg bg-muted/50 border space-y-2 text-muted-foreground text-[13px] leading-relaxed">
-                        <p><span className="font-semibold text-foreground">1. Ajoutez au moins une base</span> — un croquis, une photo smartphone ou un packshot. Plus vous en ajoutez, mieux le modele comprendra le produit.</p>
-                        <p><span className="font-semibold text-foreground">2. Choisissez le bon role</span> pour chaque image : un croquis sera interprete comme un guide de forme, une photo smartphone comme reference d'identite visuelle (couleurs, matieres).</p>
-                        <p><span className="font-semibold text-foreground">3. Decrivez chaque image</span> — meme une phrase courte aide enormement. Ex : "Croquis vue de face d'une gigoteuse avec manches longues" ou "Photo de la gigoteuse grise prise sur un canape".</p>
-                        <p><span className="font-semibold text-foreground">4. Produits de reference</span> — si vous voulez reprendre la matiere, la couleur ou les finitions d'un produit existant, ajoutez son packshot en section 2 et precisez ce que vous voulez en tirer. Ex : "Reprendre le velours vert sauge et le zip dore".</p>
-                        <p><span className="font-semibold text-foreground">5. Utilisez les notes</span> a l'etape generation pour preciser des details que les images ne montrent pas (ex : "le zip est dore", "doublure interieure blanche").</p>
-                    </div>
-                </details>
             </div>
 
             <Stepper steps={STEPS} currentStep={step} />
@@ -229,84 +138,86 @@ export default function SketchToPackshotPage() {
                 <div className="bg-destructive/10 text-destructive rounded-lg p-4 mb-6 text-sm">{error}</div>
             )}
 
-            {/* ─── Step 0: Image Inputs ─────────────────────────── */}
+            {/* ─── Step 0: Product Inputs ──────────────────────── */}
             {step === 0 && (
                 <div className="space-y-6">
-
-                    {/* ── Base images (required) ──────────────────── */}
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">
                                 <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center font-bold">1</span>
-                                Base produit
-                                <span className="text-xs font-normal text-destructive ml-1">obligatoire</span>
+                                Produits à placer dans la chambre
+                                <span className="text-xs font-normal text-destructive ml-1">min. 1 produit</span>
                             </CardTitle>
                             <p className="text-sm text-muted-foreground">
-                                Les images qui definissent le produit : croquis, photo smartphone, packshot existant, fiche technique.
-                                Vous pouvez en ajouter plusieurs pour que le modele comprenne mieux l'objet.
+                                Ajoutez les packshots des produits Noukies à mettre en scène.
+                                Tous les produits seront placés naturellement dans une chambre bébé.
+                            </p>
+                            <p className="text-xs text-amber-600 mt-1">
+                                Jusqu'à 6 produits pour une fidélité optimale. Au-delà de 6 (max 14), la qualité de reproduction peut diminuer.
                             </p>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            {baseInputs.length > 0 && (
+                            {productInputs.length > 0 && (
                                 <div className="space-y-3">
-                                    {baseInputs.map((inp, i) => (
-                                        <BaseImageCard
-                                            key={i}
-                                            input={inp}
-                                            index={i}
-                                            onUpdateRole={(v) => updateField(setBaseInputs, i, "role", v)}
-                                            onUpdateDesc={(v) => updateField(setBaseInputs, i, "description", v)}
-                                            onRemove={() => removeFrom(setBaseInputs, i)}
-                                        />
+                                    {productInputs.map((inp, i) => (
+                                        <div key={i} className="flex gap-3 items-start p-3 rounded-lg border bg-muted/30">
+                                            <div className="flex-shrink-0 relative">
+                                                <img src={inp.preview} alt={`Produit ${i + 1}`}
+                                                    className="w-24 h-24 object-contain rounded-md bg-white border" />
+                                                <span className="absolute -top-2 -left-2 w-5 h-5 rounded-full bg-primary text-primary-foreground text-[10px] flex items-center justify-center font-bold shadow">
+                                                    {i + 1}
+                                                </span>
+                                            </div>
+                                            <div className="flex-1 space-y-2 min-w-0">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-sm font-medium text-muted-foreground">Produit {i + 1}</span>
+                                                    <button onClick={() => removeProduct(i)}
+                                                        className="text-destructive hover:text-destructive/80 text-xs font-medium ml-auto">
+                                                        Supprimer
+                                                    </button>
+                                                </div>
+                                                <input
+                                                    type="text"
+                                                    value={inp.description}
+                                                    onChange={(e) => updateProductDesc(i, e.target.value)}
+                                                    placeholder={PRODUCT_PLACEHOLDERS[i % PRODUCT_PLACEHOLDERS.length]}
+                                                    className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                                                />
+                                            </div>
+                                        </div>
                                     ))}
                                 </div>
                             )}
                             <UploadZone
-                                onFile={(f) => addImage(f, baseInputs, setBaseInputs, "sketch")}
-                                label={baseInputs.length === 0 ? "Ajoutez votre premiere base" : "Ajouter une autre base"}
-                                sublabel="Croquis, photo smartphone, packshot..."
+                                onFile={handleProductUpload}
+                                label={productInputs.length === 0 ? "Ajoutez votre premier produit" : "Ajouter un autre produit"}
+                                sublabel="Packshot détouré du produit (PNG ou JPG, fond blanc)"
                             />
                         </CardContent>
                     </Card>
 
-                    {/* ── Existing product references (optional) ──── */}
+                    {/* ── Optional mood ────────────────────────── */}
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">
                                 <span className="w-6 h-6 rounded-full bg-muted text-muted-foreground text-xs flex items-center justify-center font-bold">2</span>
-                                Produits existants de reference
+                                Ambiance
                                 <span className="text-xs font-normal text-muted-foreground ml-1">optionnel</span>
                             </CardTitle>
-                            <p className="text-sm text-muted-foreground">
-                                Packshot d'un produit existant dont le modele doit s'inspirer.
-                                Decrivez ce que vous voulez reprendre : matiere, couleur, finitions, zip...
-                            </p>
                         </CardHeader>
-                        <CardContent className="space-y-4">
-                            {refInputs.length > 0 && (
-                                <div className="space-y-3">
-                                    {refInputs.map((inp, i) => (
-                                        <RefProductCard
-                                            key={i}
-                                            input={inp}
-                                            index={i}
-                                            onUpdateDesc={(v) => updateField(setRefInputs, i, "description", v)}
-                                            onRemove={() => removeFrom(setRefInputs, i)}
-                                        />
-                                    ))}
-                                </div>
-                            )}
-                            <UploadZone
-                                onFile={(f) => addImage(f, refInputs, setRefInputs, "existingProduct")}
-                                label={refInputs.length === 0 ? "Ajouter un produit de reference" : "Ajouter un autre produit"}
-                                sublabel="Packshot d'un produit existant du catalogue"
-                                className="py-4"
+                        <CardContent>
+                            <input
+                                type="text"
+                                value={sceneMood}
+                                onChange={(e) => setSceneMood(e.target.value)}
+                                placeholder="Ex: lumière dorée du matin, ambiance cocooning, tons chauds..."
+                                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                             />
                         </CardContent>
                     </Card>
 
                     <Button onClick={() => setStep(1)} disabled={!canGenerate} className="w-full">
-                        Continuer vers la generation →
+                        Continuer vers la génération →
                     </Button>
                 </div>
             )}
@@ -315,15 +226,13 @@ export default function SketchToPackshotPage() {
             {step === 1 && (
                 <Card>
                     <CardHeader>
-                        <CardTitle>Generation — Sketch → Packshot</CardTitle>
+                        <CardTitle>Génération — Scène chambre</CardTitle>
                         <p className="text-sm text-muted-foreground">
-                            {baseInputs.length} base{baseInputs.length > 1 ? "s" : ""}
-                            {refInputs.length > 0 && ` + ${refInputs.length} reference${refInputs.length > 1 ? "s" : ""}`}
-                            {" — "}chaque image a son role.
+                            {productInputs.length} produit{productInputs.length > 1 ? "s" : ""} à placer dans la chambre.
                         </p>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        {/* Reference strip with role labels */}
+                        {/* Reference strip */}
                         <div className="flex gap-3 p-3 rounded-lg bg-muted/50 border border-dashed overflow-x-auto">
                             {allPreviews.map((ref, i) => (
                                 <div key={i} className="flex-shrink-0 w-24 text-center cursor-pointer"
@@ -343,7 +252,7 @@ export default function SketchToPackshotPage() {
                                 Voir le manifeste d'images
                             </summary>
                             <div className="mt-2 p-3 rounded-lg bg-muted text-xs space-y-2">
-                                {allInputs.map((inp, i) => {
+                                {productInputs.map((inp, i) => {
                                     const role = IMAGE_ROLES[inp.role];
                                     return (
                                         <div key={i} className="flex gap-2">
@@ -353,7 +262,6 @@ export default function SketchToPackshotPage() {
                                                 {inp.description && <span className="text-muted-foreground"> — {inp.description}</span>}
                                                 <br />
                                                 <span className="text-muted-foreground">Extraire: {role?.extract}</span>
-                                                {role?.ignore && <><br /><span className="text-destructive/70">Ignorer: {role?.ignore}</span></>}
                                             </div>
                                         </div>
                                     );
@@ -368,8 +276,8 @@ export default function SketchToPackshotPage() {
                                 aspectRatio={aspectRatio} setAspectRatio={setAspectRatio}
                                 activePreset={activePreset} applyPreset={applyPreset} clearPreset={clearPreset}
                                 productNotes={productNotes} setProductNotes={setProductNotes}
-                                notesPlaceholder="Notes sur le produit (ex: le zip est dore, le tissu est du velours cotele...)"
-                                generateLabel="sketch → packshot"
+                                notesPlaceholder="Notes (ex: la gigoteuse dans le lit, le doudou sur l'étagère...)"
+                                generateLabel="scène chambre"
                                 onGenerate={handleGenerate}
                             />
                         )}
@@ -398,11 +306,11 @@ export default function SketchToPackshotPage() {
             {step === 2 && (
                 <Card>
                     <CardHeader>
-                        <CardTitle>Export & telechargement</CardTitle>
+                        <CardTitle>Export & téléchargement</CardTitle>
                         <p className="text-sm text-muted-foreground">
                             {selectedImages.size > 0
-                                ? `${selectedImages.size} image${selectedImages.size > 1 ? "s" : ""} selectionnee${selectedImages.size > 1 ? "s" : ""}`
-                                : `${filledCount} image${filledCount > 1 ? "s" : ""} — tout sera telecharge.`}
+                                ? `${selectedImages.size} image${selectedImages.size > 1 ? "s" : ""} sélectionnée${selectedImages.size > 1 ? "s" : ""}`
+                                : `${filledCount} image${filledCount > 1 ? "s" : ""} — tout sera téléchargé.`}
                         </p>
                     </CardHeader>
                     <CardContent className="space-y-4">
@@ -421,7 +329,7 @@ export default function SketchToPackshotPage() {
                                     <div className="bg-muted/80 py-1 px-2">
                                         <p className="text-xs font-medium">Variante {idx + 1}</p>
                                         <p className="text-[10px] text-muted-foreground">
-                                            {imageDims[idx] ? `${imageDims[idx].w}x${imageDims[idx].h}px` : "..."}
+                                            {imageDims[idx] ? `${imageDims[idx].w}×${imageDims[idx].h}px` : "…"}
                                         </p>
                                     </div>
                                 </div>
@@ -430,7 +338,7 @@ export default function SketchToPackshotPage() {
 
                         <div className="flex justify-between items-center">
                             <button onClick={toggleSelectAll} className="text-sm text-primary hover:underline">
-                                {selectedImages.size === filledCount ? "Tout deselectionner" : "Tout selectionner"}
+                                {selectedImages.size === filledCount ? "Tout désélectionner" : "Tout sélectionner"}
                             </button>
                         </div>
 
