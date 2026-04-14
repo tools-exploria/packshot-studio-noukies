@@ -27,30 +27,51 @@ export async function POST(request) {
         }
 
         const body = await request.json();
-        const { prompt, images, resolution, aspectRatio, model: requestedModel } = body;
+        const { prompt, images, parts, resolution, aspectRatio, model: requestedModel } = body;
 
-        if (!prompt) {
-            return NextResponse.json({ status: "error", error: "Missing prompt" }, { status: 400 });
-        }
-        if (!images || !images.length) {
-            return NextResponse.json({ status: "error", error: "Missing images" }, { status: 400 });
+        // Support two formats:
+        // 1. Interleaved parts: { parts: [{type:"text",text:"..."},{type:"image",data:"b64"},…] }
+        // 2. Legacy flat:       { prompt: "...", images: ["b64_1","b64_2"] }
+        const useInterleaved = Array.isArray(parts) && parts.length > 0;
+
+        if (!useInterleaved) {
+            if (!prompt) {
+                return NextResponse.json({ status: "error", error: "Missing prompt" }, { status: 400 });
+            }
+            if (!images || !images.length) {
+                return NextResponse.json({ status: "error", error: "Missing images" }, { status: 400 });
+            }
         }
 
         const imageSize = ["0.5K", "1K", "2K", "4K"].includes(resolution) ? resolution : "2K";
         const ratio = ["1:1", "4:3", "3:4", "16:9", "9:16", "2:3", "3:2", "4:5", "5:4"].includes(aspectRatio) ? aspectRatio : "1:1";
         const model = ALLOWED_MODELS.includes(requestedModel) ? requestedModel : DEFAULT_MODEL;
 
-        console.log(`[generate] Calling OpenRouter (model: ${model}) — ${imageSize} ${ratio}`);
-        console.log(`[generate] Prompt (first 200 chars): ${prompt.slice(0, 200)}`);
+        console.log(`[generate] Calling OpenRouter (model: ${model}) — ${imageSize} ${ratio} — ${useInterleaved ? "interleaved" : "legacy"}`);
 
-        // Build content array: text prompt + image(s)
-        const content = [
-            { type: "text", text: prompt },
-            ...images.map((b64) => ({
-                type: "image_url",
-                image_url: { url: `data:image/jpeg;base64,${b64}` },
-            })),
-        ];
+        // Build content array
+        let content;
+        if (useInterleaved) {
+            // Interleaved format: [{type:"text",text:...},{type:"image",data:...},...]
+            content = parts.map((part) => {
+                if (part.type === "image") {
+                    return { type: "image_url", image_url: { url: `data:image/jpeg;base64,${part.data}` } };
+                }
+                return { type: "text", text: part.text };
+            });
+            const firstText = parts.find((p) => p.type === "text");
+            console.log(`[generate] Prompt (first 200 chars): ${(firstText?.text || "").slice(0, 200)}`);
+        } else {
+            // Legacy format: text prompt + image(s)
+            content = [
+                { type: "text", text: prompt },
+                ...images.map((b64) => ({
+                    type: "image_url",
+                    image_url: { url: `data:image/jpeg;base64,${b64}` },
+                })),
+            ];
+            console.log(`[generate] Prompt (first 200 chars): ${prompt.slice(0, 200)}`);
+        }
 
         const requestBody = {
             model: model,

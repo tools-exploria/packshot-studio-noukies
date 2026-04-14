@@ -56,6 +56,15 @@ const MODES = [
     accent: "border-l-[#ce93d8]",
     iconBg: "bg-[#ce93d8]/20",
   },
+  {
+    title: "Pliage & Disposition",
+    description: "Pliez et disposez des vêtements selon un arrangement de référence. Idéal pour les sets, pyjamas et compositions multi-pièces.",
+    href: "/pliage",
+    icon: "👔",
+    badge: "3 étapes",
+    accent: "border-l-[#8d6e63]",
+    iconBg: "bg-[#8d6e63]/10",
+  },
 ];
 
 export default function Home() {
