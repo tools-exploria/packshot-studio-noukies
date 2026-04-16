@@ -101,6 +101,19 @@ export default function PatternPage() {
 
     return (
         <div className="max-w-4xl mx-auto px-6 py-8">
+            <div className="mb-6">
+                <details className="text-sm">
+                    <summary className="cursor-pointer font-medium text-muted-foreground hover:text-foreground">
+                        Conseils d'utilisation et limites connues
+                    </summary>
+                    <div className="mt-2 p-4 rounded-lg bg-muted/50 border space-y-2 text-muted-foreground text-[13px] leading-relaxed">
+                        <p><span className="font-semibold text-foreground">Le tiling est un processus complexe.</span> Le modele recoit votre packshot et le motif repete, puis doit comprendre ou appliquer le pattern. Sur certaines generations, le motif peut deborder sur le fond — c'est normal, surtout avec des produits clairs sur fond blanc.</p>
+                        <p><span className="font-semibold text-foreground">Generez plusieurs variantes.</span> Seule une partie des images sera exploitable directement. C'est le compromis du tiling : vous gardez un controle precis sur la taille du motif, mais il faut generer plus pour selectionner les meilleures.</p>
+                        <p><span className="font-semibold text-foreground">Astuce fond blanc.</span> Si une image est bonne mais que le fond n'est pas parfaitement blanc, passez a l'etape Export et selectionnez le mode <strong>"Fond blanc"</strong>. Ca peut corriger le fond dans la plupart des cas.</p>
+                    </div>
+                </details>
+            </div>
+
             <Stepper steps={STEPS} currentStep={step} />
 
             {error && (
