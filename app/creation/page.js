@@ -188,20 +188,8 @@ export default function SketchToPackshotPage() {
 
     return (
         <div className="max-w-4xl mx-auto px-6 py-8">
-            {/* Labo experiments nav */}
-            <div className="flex items-center gap-3 mb-6">
-                <a href="/labo"
-                    className="px-3 py-1.5 text-sm font-medium rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors">
-                    Prompt libre
-                </a>
-                <a href="/labo/sketch-to-packshot"
-                    className="px-3 py-1.5 text-sm font-semibold rounded-lg bg-primary/10 text-primary">
-                    Sketch → Packshot
-                </a>
-            </div>
-
             <div className="mb-6">
-                <h1 className="text-2xl font-bold">Sketch → Packshot</h1>
+                <h1 className="text-2xl font-bold">Création produit</h1>
                 <p className="text-sm text-muted-foreground mt-1">
                     Genere un packshot professionnel a partir d'un croquis, d'une photo smartphone ou d'un packshot existant.
                 </p>
