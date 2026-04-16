@@ -2,7 +2,6 @@
 import { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
 import { Stepper, UploadZone } from "@/components/shared";
 import { PROMPTS } from "@/lib/prompts";
 import { downloadImage, MODELS } from "@/lib/api";
@@ -13,20 +12,13 @@ import { ImageGrid } from "@/components/ImageGrid";
 import { GalleryLightbox, SimpleLightbox } from "@/components/Lightbox";
 import { useGenerationPage } from "@/hooks/useGenerationPage";
 
-const STEPS = ["Produit", "Broderie", "Placement", "Génération", "Export"];
+const STEPS = ["Produit", "Matière", "Génération", "Export"];
 
-const PLACEMENT_OPTIONS = [
-    { key: "on the LEFT SIDE as seen in the image (viewer's left)", label: "Gauche" },
-    { key: "on the RIGHT SIDE as seen in the image (viewer's right)", label: "Droite" },
-    { key: "custom", label: "Personnalisé..." },
-];
-
-export default function BroderiePage() {
+export default function ProduitTab() {
     const [step, setStep] = useState(0);
 
     const {
-        loading, setLoading,
-        error, setError,
+        loading, error, setError,
         generatedImages,
         imageDims,
         selectedImages,
@@ -47,50 +39,67 @@ export default function BroderiePage() {
         handleEditImage,
         toggleSelect,
         toggleSelectAll,
-    } = useGenerationPage();
+    } = useGenerationPage({ defaultVariantCount: 2 });
 
-    // ── Broderie-specific state ──────────────────────────────────
-    const [embroideryFile, setEmbroideryFile] = useState(null);
-    const [embroideryPreview, setEmbroideryPreview] = useState(null);
-    const [placement, setPlacement] = useState("chest center");
-    const [customPlacement, setCustomPlacement] = useState("");
+    // ── 3D-specific state: fabric/texture image ──────────────────
+    const [fabricFile, setFabricFile] = useState(null);
+    const [fabricPreview, setFabricPreview] = useState(null);
 
     const pipeline = useExportPipeline({
-        generatedImages, imageDims, resolution, aspectRatio, selectedImages, setLoading, setError,
+        generatedImages, imageDims, resolution, aspectRatio, selectedImages,
+        setLoading: () => {},
+        setError,
     });
 
-    const handleEmbroideryFile = useCallback((f) => {
-        setEmbroideryFile(f);
+    const handleFabricFile = useCallback((f) => {
+        setFabricFile(f);
         const reader = new FileReader();
-        reader.onload = (e) => setEmbroideryPreview(e.target.result);
+        reader.onload = (e) => setFabricPreview(e.target.result);
         reader.readAsDataURL(f);
     }, []);
 
-    // ── Generation handler ───────────────────────────────────────
+    // 3D generation uses a 180s timeout (heavier rendering)
     const handleGenerate = async (model = MODELS.FLASH) => {
-        if (!productFile || !embroideryFile) return;
-        const finalPlacement = placement === "custom" ? customPlacement : placement;
-        const prompt = PROMPTS.applyEmbroidery(finalPlacement, productNotes.trim() || "");
-        await runGenerate(prompt, [productFile, embroideryFile], model);
+        if (!productFile || !fabricFile) return;
+        const prompt = PROMPTS.product3D(productNotes.trim() || "");
+        await runGenerate(prompt, [productFile, fabricFile], model, 180_000);
     };
 
     return (
-        <div className="max-w-4xl mx-auto px-6 py-8">
+        <>
+            <details className="mb-4 text-sm">
+                <summary className="cursor-pointer font-medium text-muted-foreground hover:text-foreground">
+                    Comment bien utiliser cet onglet ?
+                </summary>
+                <div className="mt-2 p-4 rounded-lg bg-muted/50 border space-y-2 text-muted-foreground text-[13px] leading-relaxed">
+                    <p><span className="font-semibold text-foreground">1. Fiche technique</span> — uploadez le schema, la fiche technique ou un dessin a plat du produit. C'est la structure de reference.</p>
+                    <p><span className="font-semibold text-foreground">2. Matiere / swatch</span> — uploadez une photo du tissu a appliquer sur le produit. Le modele reproduira sa couleur ET sa texture physique (velours, jersey, corduroy...).</p>
+                    <p><span className="font-semibold text-foreground">3. Notes</span> — precisez les details non visibles (couleur du zip, type de couture...).</p>
+                </div>
+            </details>
+
             <Stepper steps={STEPS} currentStep={step} />
 
             {error && (
-                <div className="bg-destructive/10 text-destructive rounded-lg p-4 mb-6 text-sm">{error}</div>
+                <div className="bg-destructive/10 text-destructive rounded-lg p-4 mb-6 text-sm">
+                    {error}
+                </div>
             )}
 
-            {/* Step 0: Product upload */}
+            {/* ── Step 0 : Fiche technique produit ── */}
             {step === 0 && (
                 <Card>
-                    <CardHeader><CardTitle>Photo produit de référence</CardTitle></CardHeader>
+                    <CardHeader>
+                        <CardTitle>Fiche technique du produit</CardTitle>
+                        <p className="text-sm text-muted-foreground">
+                            Uploadez la fiche technique ou le schéma du produit.
+                        </p>
+                    </CardHeader>
                     <CardContent className="space-y-4">
                         <UploadZone
                             onFile={handleProductFile}
-                            label="Uploadez votre packshot détouré"
-                            sublabel="PNG ou JPG, fond blanc de préférence"
+                            label="Fiche technique / schéma produit"
+                            sublabel="PNG, JPG ou PDF — plan du produit"
                             preview={productPreview}
                         />
                         <Button onClick={() => setStep(1)} disabled={!productFile} className="w-full">
@@ -100,26 +109,25 @@ export default function BroderiePage() {
                 </Card>
             )}
 
-            {/* Step 1: Embroidery upload */}
+            {/* ── Step 1 : Image du tissu ── */}
             {step === 1 && (
                 <Card>
                     <CardHeader>
-                        <CardTitle>Design de broderie</CardTitle>
+                        <CardTitle>Image du tissu / matière</CardTitle>
                         <p className="text-sm text-muted-foreground">
-                            Uploadez l&apos;image du motif à broder (logo, monogramme, illustration).
-                            Fond transparent ou blanc de préférence.
+                            Uploadez une photo du tissu à appliquer sur le produit.
                         </p>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <UploadZone
-                            onFile={handleEmbroideryFile}
-                            label="Design broderie"
-                            sublabel="PNG avec fond transparent idéal"
-                            preview={embroideryPreview}
+                            onFile={handleFabricFile}
+                            label="Photo du tissu"
+                            sublabel="PNG ou JPG — swatch de matière"
+                            preview={fabricPreview}
                         />
                         <div className="flex gap-2">
                             <Button variant="outline" onClick={() => setStep(0)}>← Retour</Button>
-                            <Button onClick={() => setStep(2)} disabled={!embroideryFile} className="flex-1">
+                            <Button onClick={() => setStep(2)} disabled={!fabricFile} className="flex-1">
                                 Continuer →
                             </Button>
                         </div>
@@ -127,85 +135,27 @@ export default function BroderiePage() {
                 </Card>
             )}
 
-            {/* Step 2: Placement selection */}
+            {/* ── Step 2 : Génération 3D ── */}
             {step === 2 && (
                 <Card>
                     <CardHeader>
-                        <CardTitle>Emplacement de la broderie</CardTitle>
-                        <p className="text-sm text-muted-foreground">Où appliquer la broderie sur le produit ?</p>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        {/* Preview side by side */}
-                        <div className="flex gap-3 p-3 rounded-lg bg-muted/50 border border-dashed">
-                            <div className="flex-1 text-center">
-                                <img src={productPreview} alt="Produit" className="w-full aspect-square object-contain rounded-md bg-white" />
-                                <p className="text-xs text-muted-foreground mt-1">Produit</p>
-                            </div>
-                            <div className="flex-1 text-center">
-                                <img src={embroideryPreview} alt="Broderie" className="w-full aspect-square object-contain rounded-md bg-white" />
-                                <p className="text-xs text-muted-foreground mt-1">Broderie</p>
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                            {PLACEMENT_OPTIONS.map((opt) => (
-                                <button key={opt.key} onClick={() => setPlacement(opt.key)}
-                                    className={`text-left p-3 rounded-lg border transition-all text-sm ${placement === opt.key ? "border-primary bg-primary/5 shadow-sm font-medium" : "hover:border-primary/30 hover:bg-accent/50"}`}>
-                                    {opt.label}
-                                </button>
-                            ))}
-                        </div>
-
-                        {placement === "custom" && (
-                            <div className="space-y-2">
-                                <Label>Emplacement personnalisé</Label>
-                                <input
-                                    type="text"
-                                    value={customPlacement}
-                                    onChange={(e) => setCustomPlacement(e.target.value)}
-                                    placeholder="Ex: sur l'épaule droite, au centre du bavoir, sous le col..."
-                                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                                />
-                            </div>
-                        )}
-
-                        <div className="flex gap-2">
-                            <Button variant="outline" onClick={() => setStep(1)}>← Retour</Button>
-                            <Button onClick={() => setStep(3)}
-                                disabled={placement === "custom" && !customPlacement}
-                                className="flex-1">
-                                Continuer →
-                            </Button>
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
-
-            {/* Step 3: Generation */}
-            {step === 3 && (
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Génération broderie</CardTitle>
+                        <CardTitle>Génération 3D produit</CardTitle>
                         <p className="text-sm text-muted-foreground">
-                            {variantCount} variante{variantCount > 1 ? "s" : ""} — broderie appliquée sur {placement === "custom" ? customPlacement : PLACEMENT_OPTIONS.find(o => o.key === placement)?.label?.toLowerCase()}.
+                            {variantCount} variante{variantCount > 1 ? "s" : ""} générée{variantCount > 1 ? "s" : ""} par IA. Cliquez pour agrandir, cochez pour sélectionner.
                         </p>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         {/* Reference images */}
                         <div className="flex gap-3 p-3 rounded-lg bg-muted/50 border border-dashed">
                             <div className="flex-1 text-center cursor-pointer" onClick={() => pipeline.setRefLightboxSrc(productPreview)}>
-                                <img src={productPreview} alt="Produit" className="w-full aspect-square object-contain rounded-md bg-white hover:ring-2 hover:ring-primary transition-all" />
-                                <p className="text-xs text-muted-foreground mt-1">Produit 🔍</p>
+                                <img src={productPreview} alt="Fiche technique"
+                                    className="w-full aspect-square object-contain rounded-md bg-white hover:ring-2 hover:ring-primary transition-all" />
+                                <p className="text-xs text-muted-foreground mt-1">Structure 🔍</p>
                             </div>
-                            <div className="flex-1 text-center cursor-pointer" onClick={() => pipeline.setRefLightboxSrc(embroideryPreview)}>
-                                <img src={embroideryPreview} alt="Broderie" className="w-full aspect-square object-contain rounded-md bg-white hover:ring-2 hover:ring-primary transition-all" />
-                                <p className="text-xs text-muted-foreground mt-1">Broderie 🔍</p>
-                            </div>
-                            <div className="flex-1 flex flex-col items-center justify-center">
-                                <p className="text-sm font-medium">
-                                    {placement === "custom" ? customPlacement : PLACEMENT_OPTIONS.find(o => o.key === placement)?.label}
-                                </p>
-                                <p className="text-xs text-muted-foreground">Emplacement</p>
+                            <div className="flex-1 text-center cursor-pointer" onClick={() => pipeline.setRefLightboxSrc(fabricPreview)}>
+                                <img src={fabricPreview} alt="Tissu"
+                                    className="w-full aspect-square object-contain rounded-md bg-white hover:ring-2 hover:ring-primary transition-all" />
+                                <p className="text-xs text-muted-foreground mt-1">Matière 🔍</p>
                             </div>
                         </div>
 
@@ -216,8 +166,8 @@ export default function BroderiePage() {
                                 aspectRatio={aspectRatio} setAspectRatio={setAspectRatio}
                                 activePreset={activePreset} applyPreset={applyPreset} clearPreset={clearPreset}
                                 productNotes={productNotes} setProductNotes={setProductNotes}
-                                notesPlaceholder="Ex: La broderie doit être en fil doré. Le tissu est du velours, la broderie doit s'enfoncer légèrement."
-                                generateLabel="broderie"
+                                notesPlaceholder="Ex: Le tissu doit envelopper le produit de manière réaliste. Les coutures doivent être visibles."
+                                generateLabel="visualisation 3D"
                                 onGenerate={handleGenerate}
                             />
                         )}
@@ -232,14 +182,16 @@ export default function BroderiePage() {
                             handleEditImage={handleEditImage}
                             onDownload={(i) => downloadImage(generatedImages[i], pipeline.getFileName(i))}
                             onGenerate={handleGenerate}
-                            onExport={() => setStep(4)}
+                            onExport={() => setStep(3)}
                         />
+
+                        <Button variant="outline" onClick={() => setStep(1)} className="w-full">← Retour</Button>
                     </CardContent>
                 </Card>
             )}
 
-            {/* Step 4: Export */}
-            {step === 4 && (
+            {/* Step 3: Export */}
+            {step === 3 && (
                 <Card>
                     <CardHeader>
                         <CardTitle>Export & téléchargement</CardTitle>
@@ -289,12 +241,11 @@ export default function BroderiePage() {
                             selectedImages={selectedImages}
                         />
 
-                        <Button variant="outline" onClick={() => setStep(3)} className="w-full">← Retour</Button>
+                        <Button variant="outline" onClick={() => setStep(2)} className="w-full">← Retour</Button>
                     </CardContent>
                 </Card>
             )}
 
-            {/* Gallery lightbox */}
             <GalleryLightbox
                 images={generatedImages}
                 imageDims={imageDims}
@@ -305,11 +256,10 @@ export default function BroderiePage() {
                 toggleSelect={toggleSelect}
             />
 
-            {/* Reference lightbox */}
             <SimpleLightbox
                 src={pipeline.refLightboxSrc}
                 onClose={() => pipeline.setRefLightboxSrc(null)}
             />
-        </div>
+        </>
     );
 }
