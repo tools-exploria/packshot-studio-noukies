@@ -8,7 +8,7 @@
  */
 "use client";
 import { useState, useCallback } from "react";
-import { fileToBase64, generateImages, MODELS } from "@/lib/api";
+import { fileToBase64, compressBase64Image, generateImages, MODELS } from "@/lib/api";
 
 /**
  * Generation presets — pre-configured resolution + aspect ratio combos
@@ -164,9 +164,11 @@ export function useGenerationPage({
         setEditLoading(true);
         setError(null);
         try {
+            // Compress the source image to stay under Vercel's 4.5 MB body limit
+            const compressedB64 = await compressBase64Image(generatedImages[idx], "image/png");
             const results = await generateImages({
                 prompt: editPrompt.trim(),
-                images: [generatedImages[idx]],
+                images: [compressedB64],
                 count: 1,
                 model,
                 resolution,
