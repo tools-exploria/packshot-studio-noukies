@@ -2,6 +2,16 @@
 import { useCallback, useRef, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 
+export function LoadingDots({ className = "" }) {
+    return (
+        <span className={`inline-flex items-center gap-0.5 ${className}`}>
+            <span className="w-1 h-1 bg-current rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+            <span className="w-1 h-1 bg-current rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+            <span className="w-1 h-1 bg-current rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+        </span>
+    );
+}
+
 export function UploadZone({ onFile, accept = "image/*", label = "Glissez-déposez votre image", sublabel = "ou cliquez pour sélectionner", preview = null, className = "" }) {
     const [dragover, setDragover] = useState(false);
     const inputRef = useRef(null);

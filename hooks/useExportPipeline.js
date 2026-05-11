@@ -31,6 +31,7 @@ export function useExportPipeline({ generatedImages, imageDims, resolution, aspe
     const [greenScreenImages, setGreenScreenImages] = useState({});
     const [detouredImages, setDetouredImages] = useState({});
     const [detourProgress, setDetourProgress] = useState(null);
+    const [regeneratingIdx, setRegeneratingIdx] = useState(null);
     const [exportSize, setExportSize] = useState("");
     // Ref lightbox (for green screen previews)
     const [refLightboxSrc, setRefLightboxSrc] = useState(null);
@@ -58,6 +59,7 @@ export function useExportPipeline({ generatedImages, imageDims, resolution, aspe
             : PROMPTS.chromaKeyBg(CHROMA_COLORS[chromaColor], chromaColor);
 
         setDetourProgress(bgMode === "white" ? "Fond blanc..." : `Fond ${chromaColor}...`);
+        setRegeneratingIdx(idx);
         const res = await fetch("/api/generate", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -65,6 +67,7 @@ export function useExportPipeline({ generatedImages, imageDims, resolution, aspe
         });
         const data = await res.json();
         setDetourProgress(null);
+        setRegeneratingIdx(null);
         if (data.status === "success" && data.image) {
             setGreenScreenImages((prev) => ({ ...prev, [idx]: data.image }));
             setDetouredImages((prev) => { const next = { ...prev }; delete next[idx]; return next; });
@@ -254,6 +257,7 @@ export function useExportPipeline({ generatedImages, imageDims, resolution, aspe
         greenScreenImages, setGreenScreenImages,
         detouredImages, setDetouredImages,
         detourProgress,
+        regeneratingIdx,
         exportSize, setExportSize,
         refLightboxSrc, setRefLightboxSrc,
         generateGreenScreen, generateAllGreenScreens,

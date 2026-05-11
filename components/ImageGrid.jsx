@@ -1,6 +1,7 @@
 "use client";
 import { Button } from "@/components/ui/button";
 import { MODELS } from "@/lib/api";
+import { LoadingDots } from "@/components/shared";
 
 /**
  * Shared image grid with selection, download, inline edit, and regeneration.
@@ -77,11 +78,11 @@ export function ImageGrid({
                                                         autoFocus />
                                                     <Button size="sm" variant="outline" disabled={editLoading || !editPrompt.trim()}
                                                         onClick={() => handleEditImage(i, MODELS.FLASH)} className="text-xs h-7" title="Rapide (Flash)">
-                                                        {editLoading ? "…" : "⚡"}
+                                                        {editLoading ? <LoadingDots /> : "⚡"}
                                                     </Button>
                                                     <Button size="sm" disabled={editLoading || !editPrompt.trim()}
                                                         onClick={() => handleEditImage(i, MODELS.PRO)} className="text-xs h-7" title="Qualité (Pro)">
-                                                        {editLoading ? "…" : "Pro"}
+                                                        {editLoading ? <LoadingDots /> : "Pro"}
                                                     </Button>
                                                 </div>
                                                 {error && error.startsWith("Modification") && (

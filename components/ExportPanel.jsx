@@ -1,5 +1,6 @@
 "use client";
 import { Button } from "@/components/ui/button";
+import { LoadingDots } from "@/components/shared";
 
 /**
  * Shared export panel UI: background mode, chroma key picker, resize, download buttons.
@@ -18,6 +19,7 @@ export function ExportPanel({ pipeline, generatedImages, loading, filledCount, s
         greenScreenImages,
         detouredImages,
         detourProgress,
+        regeneratingIdx,
         exportSize, setExportSize,
         refLightboxSrc, setRefLightboxSrc,
         generateGreenScreen, generateAllGreenScreens,
@@ -54,17 +56,20 @@ export function ExportPanel({ pipeline, generatedImages, loading, filledCount, s
                             disabled={loading}
                             className="w-full"
                         >
-                            {loading && detourProgress
-                                ? `Génération fond blanc ${detourProgress}...`
-                                : Object.keys(greenScreenImages).length > 0
-                                    ? `🔄 Régénérer le fond blanc`
-                                    : `⬜ Préparer le fond blanc`}
+                            {loading && detourProgress ? (
+                                <span className="inline-flex items-center gap-1.5">
+                                    Génération fond blanc {detourProgress} <LoadingDots />
+                                </span>
+                            ) : Object.keys(greenScreenImages).length > 0
+                                ? `🔄 Régénérer le fond blanc`
+                                : `⬜ Préparer le fond blanc`}
                         </Button>
                         {Object.keys(greenScreenImages).length > 0 && (
                             <GreenScreenGrid
                                 generatedImages={generatedImages}
                                 greenScreenImages={greenScreenImages}
                                 loading={loading}
+                                regeneratingIdx={regeneratingIdx}
                                 label="Aperçu fond blanc"
                                 bgStyle="bg-white"
                                 onRegenerate={generateGreenScreen}
@@ -100,17 +105,20 @@ export function ExportPanel({ pipeline, generatedImages, loading, filledCount, s
                             disabled={loading}
                             className="w-full"
                         >
-                            {loading && detourProgress
-                                ? `Génération fond ${detourProgress}...`
-                                : Object.keys(greenScreenImages).length > 0
-                                    ? `🔄 Régénérer le fond`
-                                    : `🎨 Préparer le détourage`}
+                            {loading && detourProgress ? (
+                                <span className="inline-flex items-center gap-1.5">
+                                    Génération fond {detourProgress} <LoadingDots />
+                                </span>
+                            ) : Object.keys(greenScreenImages).length > 0
+                                ? `🔄 Régénérer le fond`
+                                : `🎨 Préparer le détourage`}
                         </Button>
                         {Object.keys(greenScreenImages).length > 0 && (
                             <GreenScreenGrid
                                 generatedImages={generatedImages}
                                 greenScreenImages={greenScreenImages}
                                 loading={loading}
+                                regeneratingIdx={regeneratingIdx}
                                 label="Aperçu fonds"
                                 bgStyle={chromaColor === "green" ? "#00FF00" : chromaColor === "magenta" ? "#FF00FF" : "#0000FF"}
                                 chromaBg
@@ -175,25 +183,30 @@ export function ExportPanel({ pipeline, generatedImages, loading, filledCount, s
 }
 
 // Internal sub-component: green screen preview grid
-function GreenScreenGrid({ generatedImages, greenScreenImages, loading, label, bgStyle, chromaBg, onRegenerate, onZoom }) {
+function GreenScreenGrid({ generatedImages, greenScreenImages, loading, regeneratingIdx, label, bgStyle, chromaBg, onRegenerate, onZoom }) {
     return (
         <div className="space-y-2">
             <p className="text-xs font-medium text-muted-foreground">{label} — cliquez 🔄 pour relancer</p>
             <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                 {generatedImages.map((img, idx) => img && greenScreenImages[idx] && (
-                    <div key={idx} className="relative rounded-md overflow-hidden border cursor-pointer" onClick={() => onZoom(`data:image/png;base64,${greenScreenImages[idx]}`)}>
+                    <div key={idx} className={`relative rounded-md overflow-hidden border cursor-pointer ${regeneratingIdx === idx ? "animate-pulse" : ""}`} onClick={() => onZoom(`data:image/png;base64,${greenScreenImages[idx]}`)}>
                         <img
                             src={`data:image/png;base64,${greenScreenImages[idx]}`}
                             alt={`Fond ${idx + 1}`}
                             className={`w-full aspect-square object-contain ${chromaBg ? "" : "bg-white"}`}
                             style={chromaBg ? { background: bgStyle } : undefined}
                         />
+                        {regeneratingIdx === idx && (
+                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center text-white">
+                                <LoadingDots className="scale-150" />
+                            </div>
+                        )}
                         <button
                             onClick={(e) => { e.stopPropagation(); onRegenerate(idx); }}
                             disabled={loading}
-                            className="absolute top-1 right-1 w-6 h-6 rounded-full bg-white/90 hover:bg-white flex items-center justify-center text-xs shadow"
+                            className="absolute top-1 right-1 w-6 h-6 rounded-full bg-white/90 hover:bg-white flex items-center justify-center text-xs shadow disabled:opacity-50"
                             title="Relancer"
-                        >🔄</button>
+                        >{regeneratingIdx === idx ? <LoadingDots /> : "🔄"}</button>
                         <button
                             onClick={(e) => { e.stopPropagation(); onZoom(`data:image/png;base64,${greenScreenImages[idx]}`); }}
                             className="absolute top-1 left-1 w-6 h-6 rounded-full bg-white/90 hover:bg-white flex items-center justify-center text-xs shadow"
