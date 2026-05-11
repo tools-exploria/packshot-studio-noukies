@@ -6,9 +6,9 @@ const NAV_LINKS = [
     { href: "/couleur", label: "Couleur", icon: "🖌️" },
     { href: "/broderie", label: "Broderie", icon: "🧵" },
     // { href: "/angles", label: "Angles", icon: "📐" }, // disabled for client
-    { href: "/ambiance", label: "Ambiance", icon: "📸" },
-    { href: "/creation", label: "Création", icon: "🖋️" },
+    { href: "/creation", label: "Packshot", icon: "🖋️" },
     { href: "/pliage", label: "Pliage", icon: "👔" },
+    { href: "/ambiance", label: "Ambiance", icon: "📸" },
     { href: "/labo", label: "Labo", icon: "🧪" },
 ];
 

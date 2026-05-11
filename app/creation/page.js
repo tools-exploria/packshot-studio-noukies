@@ -14,7 +14,7 @@ export default function CreationPage() {
     return (
         <div className="max-w-4xl mx-auto px-6 py-8">
             <div className="mb-6">
-                <h1 className="text-2xl font-bold">Création produit</h1>
+                <h1 className="text-2xl font-bold">Packshot</h1>
                 <p className="text-sm text-muted-foreground mt-1">
                     {tab === "sketch"
                         ? "Genere un packshot professionnel a partir d'un croquis, d'une photo smartphone ou d'un packshot existant."

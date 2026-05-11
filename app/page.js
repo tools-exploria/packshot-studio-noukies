@@ -49,7 +49,7 @@ const MODES = [
     iconBg: "bg-[#a5d6a7]/20",
   },
   {
-    title: "Création produit",
+    title: "Packshot",
     description: "Générez un packshot professionnel à partir d'un croquis, d'une photo smartphone ou de packshots existants. Idéal pour prototyper de nouveaux produits.",
     href: "/creation",
     icon: "🖋️",
