@@ -4,10 +4,10 @@ import { Card, CardContent } from "@/components/ui/card";
 
 export function LoadingDots({ className = "" }) {
     return (
-        <span className={`inline-flex items-center gap-0.5 ${className}`}>
-            <span className="w-1 h-1 bg-current rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-            <span className="w-1 h-1 bg-current rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-            <span className="w-1 h-1 bg-current rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+        <span className={`inline-flex items-center gap-1 ${className}`}>
+            <span className="w-1.5 h-1.5 bg-current rounded-full animate-bounce" style={{ animationDelay: "0ms", animationDuration: "0.6s" }} />
+            <span className="w-1.5 h-1.5 bg-current rounded-full animate-bounce" style={{ animationDelay: "150ms", animationDuration: "0.6s" }} />
+            <span className="w-1.5 h-1.5 bg-current rounded-full animate-bounce" style={{ animationDelay: "300ms", animationDuration: "0.6s" }} />
         </span>
     );
 }
