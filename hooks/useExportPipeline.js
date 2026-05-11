@@ -58,7 +58,6 @@ export function useExportPipeline({ generatedImages, imageDims, resolution, aspe
             ? PROMPTS.whiteBg
             : PROMPTS.chromaKeyBg(CHROMA_COLORS[chromaColor], chromaColor);
 
-        setDetourProgress(bgMode === "white" ? "Fond blanc..." : `Fond ${chromaColor}...`);
         setRegeneratingIdx(idx);
         const res = await fetch("/api/generate", {
             method: "POST",
@@ -66,7 +65,6 @@ export function useExportPipeline({ generatedImages, imageDims, resolution, aspe
             body: JSON.stringify({ prompt, images: [img], model: MODELS.FLASH, resolution, aspectRatio }),
         });
         const data = await res.json();
-        setDetourProgress(null);
         setRegeneratingIdx(null);
         if (data.status === "success" && data.image) {
             setGreenScreenImages((prev) => ({ ...prev, [idx]: data.image }));
