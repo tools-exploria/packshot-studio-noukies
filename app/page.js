@@ -12,8 +12,8 @@ const MODES = [
     iconBg: "bg-[#b8956a]/10",
   },
   {
-    title: "Couleur / Texture",
-    description: "Changez la couleur ou la texture du tissu. Color picker avec presets, upload de texture (velours, jersey, corduroy...).",
+    title: "Couleur / Matière",
+    description: "Changez la couleur ou la matière du tissu. Color picker avec presets, upload de matière (velours, jersey, corduroy...).",
     href: "/couleur",
     icon: "🖌️",
     badge: "5 étapes",

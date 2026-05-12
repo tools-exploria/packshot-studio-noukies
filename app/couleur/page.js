@@ -12,7 +12,7 @@ import { ImageGrid } from "@/components/ImageGrid";
 import { GalleryLightbox, SimpleLightbox } from "@/components/Lightbox";
 import { useGenerationPage } from "@/hooks/useGenerationPage";
 
-const STEPS = ["Produit", "Couleur / Texture", "Génération", "Export"];
+const STEPS = ["Produit", "Couleur / Matière", "Génération", "Export"];
 
 const PRESET_COLORS = [
     { name: "Bleu marine", value: "#1a237e" },
@@ -119,11 +119,11 @@ export default function CouleurPage() {
             {/* Step 1: Color or texture */}
             {step === 1 && (
                 <Card>
-                    <CardHeader><CardTitle>Couleur ou texture du tissu</CardTitle></CardHeader>
+                    <CardHeader><CardTitle>Couleur ou matière du tissu</CardTitle></CardHeader>
                     <CardContent className="space-y-6">
                         <div className="flex gap-2">
                             <Button variant={colorMode === "picker" ? "default" : "outline"} onClick={() => setColorMode("picker")}>🎨 Couleur unie</Button>
-                            <Button variant={colorMode === "texture" ? "default" : "outline"} onClick={() => setColorMode("texture")}>🧵 Texture tissu</Button>
+                            <Button variant={colorMode === "texture" ? "default" : "outline"} onClick={() => setColorMode("texture")}>🧵 Matière tissu</Button>
                         </div>
 
                         {colorMode === "picker" && (
@@ -151,7 +151,7 @@ export default function CouleurPage() {
                         )}
 
                         {colorMode === "texture" && (
-                            <UploadZone onFile={handleTextureFile} label="Uploadez votre texture tissu" sublabel="Velours, jersey, lin..." preview={texturePreview} />
+                            <UploadZone onFile={handleTextureFile} label="Uploadez votre matière tissu" sublabel="Velours, jersey, lin..." preview={texturePreview} />
                         )}
 
                         <div className="flex gap-2">
@@ -180,8 +180,8 @@ export default function CouleurPage() {
                             </div>
                             {colorMode === "texture" && texturePreview && (
                                 <div className="flex-1 text-center cursor-pointer" onClick={() => pipeline.setRefLightboxSrc(texturePreview)}>
-                                    <img src={texturePreview} alt="Texture" className="w-full aspect-square object-contain rounded-md bg-white hover:ring-2 hover:ring-primary transition-all" />
-                                    <p className="text-xs text-muted-foreground mt-1">Texture 🔍</p>
+                                    <img src={texturePreview} alt="Matière" className="w-full aspect-square object-contain rounded-md bg-white hover:ring-2 hover:ring-primary transition-all" />
+                                    <p className="text-xs text-muted-foreground mt-1">Matière 🔍</p>
                                 </div>
                             )}
                             {colorMode === "picker" && (

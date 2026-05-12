@@ -3,7 +3,7 @@ import { usePathname } from "next/navigation";
 
 const NAV_LINKS = [
     { href: "/pattern", label: "Motif", icon: "🎨" },
-    { href: "/couleur", label: "Couleur", icon: "🖌️" },
+    { href: "/couleur", label: "Couleur/Matière", icon: "🖌️" },
     { href: "/broderie", label: "Broderie", icon: "🧵" },
     // { href: "/angles", label: "Angles", icon: "📐" }, // disabled for client
     { href: "/creation", label: "Packshot", icon: "🖋️" },
