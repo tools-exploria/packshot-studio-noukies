@@ -64,7 +64,7 @@ export function ExportPanel({ pipeline, generatedImages, loading, filledCount, s
                                 ? `🔄 Régénérer le fond blanc`
                                 : `⬜ Préparer le fond blanc`}
                         </Button>
-                        {Object.keys(greenScreenImages).length > 0 && (
+                        {(loading || Object.keys(greenScreenImages).length > 0) && (
                             <GreenScreenGrid
                                 generatedImages={generatedImages}
                                 greenScreenImages={greenScreenImages}
@@ -113,7 +113,7 @@ export function ExportPanel({ pipeline, generatedImages, loading, filledCount, s
                                 ? `🔄 Régénérer le fond`
                                 : `🎨 Préparer le détourage`}
                         </Button>
-                        {Object.keys(greenScreenImages).length > 0 && (
+                        {(loading || Object.keys(greenScreenImages).length > 0) && (
                             <GreenScreenGrid
                                 generatedImages={generatedImages}
                                 greenScreenImages={greenScreenImages}
@@ -188,33 +188,50 @@ function GreenScreenGrid({ generatedImages, greenScreenImages, loading, regenera
         <div className="space-y-2">
             <p className="text-xs font-medium text-muted-foreground">{label} — cliquez 🔄 pour relancer</p>
             <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                {generatedImages.map((img, idx) => img && greenScreenImages[idx] && (
-                    <div key={idx} className={`relative rounded-md overflow-hidden border cursor-pointer ${regeneratingIdx === idx ? "animate-pulse" : ""}`} onClick={() => onZoom(`data:image/png;base64,${greenScreenImages[idx]}`)}>
-                        <img
-                            src={`data:image/png;base64,${greenScreenImages[idx]}`}
-                            alt={`Fond ${idx + 1}`}
-                            className={`w-full aspect-square object-contain ${chromaBg ? "" : "bg-white"}`}
-                            style={chromaBg ? { background: bgStyle } : undefined}
-                        />
-                        {regeneratingIdx === idx && (
-                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center text-white">
-                                <LoadingDots className="scale-150" />
-                            </div>
-                        )}
-                        <button
-                            onClick={(e) => { e.stopPropagation(); onRegenerate(idx); }}
-                            disabled={loading}
-                            className="absolute top-1 right-1 w-6 h-6 rounded-full bg-white/90 hover:bg-white flex items-center justify-center text-xs shadow disabled:opacity-50"
-                            title="Relancer"
-                        >{regeneratingIdx === idx ? <LoadingDots /> : "🔄"}</button>
-                        <button
-                            onClick={(e) => { e.stopPropagation(); onZoom(`data:image/png;base64,${greenScreenImages[idx]}`); }}
-                            className="absolute top-1 left-1 w-6 h-6 rounded-full bg-white/90 hover:bg-white flex items-center justify-center text-xs shadow"
-                            title="Agrandir"
-                        >🔍</button>
-                        <div className="absolute bottom-0 left-0 right-0 bg-black/40 text-white text-[10px] text-center py-0.5">V{idx + 1}</div>
-                    </div>
-                ))}
+                {generatedImages.map((img, idx) => {
+                    if (!img) return null;
+                    const ready = !!greenScreenImages[idx];
+                    const isRegenerating = regeneratingIdx === idx;
+                    return (
+                        <div key={idx} className={`relative rounded-md overflow-hidden border ${ready ? "cursor-pointer" : ""} ${isRegenerating || !ready ? "animate-pulse" : ""}`} onClick={ready ? () => onZoom(`data:image/png;base64,${greenScreenImages[idx]}`) : undefined}>
+                            {ready ? (
+                                <img
+                                    src={`data:image/png;base64,${greenScreenImages[idx]}`}
+                                    alt={`Fond ${idx + 1}`}
+                                    className={`w-full aspect-square object-contain ${chromaBg ? "" : "bg-white"}`}
+                                    style={chromaBg ? { background: bgStyle } : undefined}
+                                />
+                            ) : (
+                                <div className={`w-full aspect-square flex items-center justify-center ${chromaBg ? "" : "bg-muted"}`} style={chromaBg ? { background: bgStyle } : undefined}>
+                                    <div className="bg-black/40 rounded-full px-2 py-1 text-white">
+                                        <LoadingDots />
+                                    </div>
+                                </div>
+                            )}
+                            {ready && isRegenerating && (
+                                <div className="absolute inset-0 bg-black/40 flex items-center justify-center text-white">
+                                    <LoadingDots className="scale-150" />
+                                </div>
+                            )}
+                            {ready && (
+                                <>
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); onRegenerate(idx); }}
+                                        disabled={loading}
+                                        className="absolute top-1 right-1 w-6 h-6 rounded-full bg-white/90 hover:bg-white flex items-center justify-center text-xs shadow disabled:opacity-50"
+                                        title="Relancer"
+                                    >{isRegenerating ? <LoadingDots /> : "🔄"}</button>
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); onZoom(`data:image/png;base64,${greenScreenImages[idx]}`); }}
+                                        className="absolute top-1 left-1 w-6 h-6 rounded-full bg-white/90 hover:bg-white flex items-center justify-center text-xs shadow"
+                                        title="Agrandir"
+                                    >🔍</button>
+                                </>
+                            )}
+                            <div className="absolute bottom-0 left-0 right-0 bg-black/40 text-white text-[10px] text-center py-0.5">V{idx + 1}</div>
+                        </div>
+                    );
+                })}
             </div>
         </div>
     );
