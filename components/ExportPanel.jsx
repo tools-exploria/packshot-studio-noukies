@@ -53,10 +53,10 @@ export function ExportPanel({ pipeline, generatedImages, loading, filledCount, s
                         <Button
                             variant="outline"
                             onClick={generateAllGreenScreens}
-                            disabled={loading}
+                            disabled={loading || !!detourProgress || regeneratingIdx !== null}
                             className="w-full"
                         >
-                            {loading && detourProgress ? (
+                            {detourProgress ? (
                                 <span className="inline-flex items-center gap-1.5">
                                     Génération fond blanc {detourProgress} <LoadingDots />
                                 </span>
@@ -64,11 +64,11 @@ export function ExportPanel({ pipeline, generatedImages, loading, filledCount, s
                                 ? `🔄 Régénérer le fond blanc`
                                 : `⬜ Préparer le fond blanc`}
                         </Button>
-                        {(loading || Object.keys(greenScreenImages).length > 0) && (
+                        {(detourProgress || regeneratingIdx !== null || Object.keys(greenScreenImages).length > 0) && (
                             <GreenScreenGrid
                                 generatedImages={generatedImages}
                                 greenScreenImages={greenScreenImages}
-                                loading={loading}
+                                loading={loading || !!detourProgress || regeneratingIdx !== null}
                                 regeneratingIdx={regeneratingIdx}
                                 label="Aperçu fond blanc"
                                 bgStyle="bg-white"
@@ -102,10 +102,10 @@ export function ExportPanel({ pipeline, generatedImages, loading, filledCount, s
                         <Button
                             variant="outline"
                             onClick={generateAllGreenScreens}
-                            disabled={loading}
+                            disabled={loading || !!detourProgress || regeneratingIdx !== null}
                             className="w-full"
                         >
-                            {loading && detourProgress ? (
+                            {detourProgress ? (
                                 <span className="inline-flex items-center gap-1.5">
                                     Génération fond {detourProgress} <LoadingDots />
                                 </span>
@@ -113,11 +113,11 @@ export function ExportPanel({ pipeline, generatedImages, loading, filledCount, s
                                 ? `🔄 Régénérer le fond`
                                 : `🎨 Préparer le détourage`}
                         </Button>
-                        {(loading || Object.keys(greenScreenImages).length > 0) && (
+                        {(detourProgress || regeneratingIdx !== null || Object.keys(greenScreenImages).length > 0) && (
                             <GreenScreenGrid
                                 generatedImages={generatedImages}
                                 greenScreenImages={greenScreenImages}
-                                loading={loading}
+                                loading={loading || !!detourProgress || regeneratingIdx !== null}
                                 regeneratingIdx={regeneratingIdx}
                                 label="Aperçu fonds"
                                 bgStyle={chromaColor === "green" ? "#00FF00" : chromaColor === "magenta" ? "#FF00FF" : "#0000FF"}
