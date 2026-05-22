@@ -70,6 +70,7 @@ export function ExportPanel({ pipeline, generatedImages, loading, filledCount, s
                                 greenScreenImages={greenScreenImages}
                                 loading={loading || !!detourProgress || regeneratingIdx !== null}
                                 regeneratingIdx={regeneratingIdx}
+                                selectedImages={selectedImages}
                                 label="Aperçu fond blanc"
                                 bgStyle="bg-white"
                                 onRegenerate={generateGreenScreen}
@@ -119,6 +120,7 @@ export function ExportPanel({ pipeline, generatedImages, loading, filledCount, s
                                 greenScreenImages={greenScreenImages}
                                 loading={loading || !!detourProgress || regeneratingIdx !== null}
                                 regeneratingIdx={regeneratingIdx}
+                                selectedImages={selectedImages}
                                 label="Aperçu fonds"
                                 bgStyle={chromaColor === "green" ? "#00FF00" : chromaColor === "magenta" ? "#FF00FF" : "#0000FF"}
                                 chromaBg
@@ -154,28 +156,32 @@ export function ExportPanel({ pipeline, generatedImages, loading, filledCount, s
 
             {/* Export buttons */}
             <div className="grid grid-cols-3 gap-3">
-                <Button onClick={handleExport} disabled={loading} className="w-full" size="lg">
-                    {loading && !detourProgress
-                        ? "..."
-                        : detourProgress
-                            ? `${detourProgress}...`
+                <Button onClick={handleExport} disabled={loading || !!detourProgress || regeneratingIdx !== null} className="w-full" size="lg">
+                    {detourProgress
+                        ? <span className="inline-flex items-center gap-1.5">{detourProgress} <LoadingDots /></span>
+                        : loading
+                            ? <LoadingDots />
                             : selectedImages.size > 0
                                 ? `⬇ PNG (${selectedImages.size})`
                                 : `⬇ PNG (${filledCount})`}
                 </Button>
-                <Button onClick={handleExportJPG} disabled={loading} className="w-full" size="lg" variant="outline">
-                    {loading && !detourProgress
-                        ? "..."
-                        : selectedImages.size > 0
-                            ? `⬇ JPG (${selectedImages.size})`
-                            : `⬇ JPG (${filledCount})`}
+                <Button onClick={handleExportJPG} disabled={loading || !!detourProgress || regeneratingIdx !== null} className="w-full" size="lg" variant="outline">
+                    {detourProgress
+                        ? <span className="inline-flex items-center gap-1.5">{detourProgress} <LoadingDots /></span>
+                        : loading
+                            ? <LoadingDots />
+                            : selectedImages.size > 0
+                                ? `⬇ JPG (${selectedImages.size})`
+                                : `⬇ JPG (${filledCount})`}
                 </Button>
-                <Button onClick={handleExportPDF} disabled={loading} variant="outline" size="lg">
-                    {loading && !detourProgress
-                        ? "..."
-                        : selectedImages.size > 0
-                            ? `📄 PDF (${selectedImages.size})`
-                            : `📄 PDF (${filledCount})`}
+                <Button onClick={handleExportPDF} disabled={loading || !!detourProgress || regeneratingIdx !== null} variant="outline" size="lg">
+                    {detourProgress
+                        ? <span className="inline-flex items-center gap-1.5">{detourProgress} <LoadingDots /></span>
+                        : loading
+                            ? <LoadingDots />
+                            : selectedImages.size > 0
+                                ? `📄 PDF (${selectedImages.size})`
+                                : `📄 PDF (${filledCount})`}
                 </Button>
             </div>
         </div>
@@ -183,7 +189,9 @@ export function ExportPanel({ pipeline, generatedImages, loading, filledCount, s
 }
 
 // Internal sub-component: green screen preview grid
-function GreenScreenGrid({ generatedImages, greenScreenImages, loading, regeneratingIdx, label, bgStyle, chromaBg, onRegenerate, onZoom }) {
+function GreenScreenGrid({ generatedImages, greenScreenImages, loading, regeneratingIdx, selectedImages, label, bgStyle, chromaBg, onRegenerate, onZoom }) {
+    const hasSelection = selectedImages && selectedImages.size > 0;
+    const inCurrentBatch = (idx) => !hasSelection || selectedImages.has(idx);
     return (
         <div className="space-y-2">
             <p className="text-xs font-medium text-muted-foreground">{label} — cliquez 🔄 pour relancer</p>
@@ -192,6 +200,7 @@ function GreenScreenGrid({ generatedImages, greenScreenImages, loading, regenera
                     if (!img) return null;
                     const ready = !!greenScreenImages[idx];
                     const isRegenerating = regeneratingIdx === idx;
+                    if (!ready && (!loading || !inCurrentBatch(idx)) && !isRegenerating) return null;
                     return (
                         <div key={idx} className={`relative rounded-md overflow-hidden border ${ready ? "cursor-pointer" : ""} ${isRegenerating || !ready ? "animate-pulse" : ""}`} onClick={ready ? () => onZoom(`data:image/png;base64,${greenScreenImages[idx]}`) : undefined}>
                             {ready ? (
