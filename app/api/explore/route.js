@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import sharp from "sharp";
 
 /**
  * POST /api/explore
@@ -248,6 +249,35 @@ Champ cible : ${role || "?"}
 ${ROLE_LENGTHS[role] || "Format des prompts : adapter au contexte."}`;
 }
 
+/**
+ * Anthropic recommends ≤1568px on the long edge. The Reformulable component
+ * receives the raw productPreview (uncompressed FileReader output), which can
+ * easily be 4K from a smartphone packshot — that exceeds OpenRouter / Anthropic
+ * limits and produces an opaque "Provider returned error 400". We compress
+ * defensively here. Already-small images pass through untouched.
+ */
+async function compressImageForAnthropic(b64) {
+    const sizeKB = Math.round(b64.length / 1024);
+    if (sizeKB < 1200) {
+        console.log(`[explore] image ${sizeKB}KB — pass-through (under 1200KB)`);
+        return b64;
+    }
+    try {
+        const buffer = Buffer.from(b64, "base64");
+        const compressed = await sharp(buffer)
+            .rotate() // honor EXIF orientation
+            .resize(1568, 1568, { fit: "inside", withoutEnlargement: true })
+            .jpeg({ quality: 85, mozjpeg: true })
+            .toBuffer();
+        const newSizeKB = Math.round(compressed.length / 1024 * 4 / 3); // base64 overhead
+        console.log(`[explore] image ${sizeKB}KB → ${newSizeKB}KB after sharp compression`);
+        return compressed.toString("base64");
+    } catch (err) {
+        console.warn("[explore] image compression failed, sending as-is:", err.message);
+        return b64;
+    }
+}
+
 export async function POST(request) {
     try {
         if (!API_KEY) {
@@ -258,11 +288,13 @@ export async function POST(request) {
         }
 
         const body = await request.json();
-        const { text = "", context = {}, image } = body;
+        const { text = "", context = {}, image: rawImage } = body;
 
         const userContent = [];
 
+        let image = rawImage;
         if (image) {
+            image = await compressImageForAnthropic(image);
             userContent.push({
                 type: "image_url",
                 image_url: { url: `data:image/jpeg;base64,${image}` },
@@ -317,11 +349,62 @@ export async function POST(request) {
         }
 
         const data = await res.json();
-        const raw = data.choices?.[0]?.message?.content?.trim();
+
+        // OpenRouter can return HTTP 200 OK with an error object in the body
+        // when the upstream provider (Anthropic) returned a non-success status.
+        // Detect this and surface a useful message instead of falling through
+        // to the "empty content" branch (which gives no actionable info).
+        if (data.error) {
+            const err = data.error;
+            const code = err.code || err.status || "?";
+            const msg = err.message || JSON.stringify(err);
+            console.error(`[explore] Provider error code=${code} msg=${msg} full=${JSON.stringify(data).slice(0, 500)}`);
+
+            let userMessage = `Erreur du fournisseur (code ${code}) : ${msg}`;
+            if (String(code) === "400") {
+                userMessage = "Erreur 400 — image probablement trop volumineuse ou format non supporté. " +
+                    "La compression automatique vient d'être ajoutée — réessayez. " +
+                    "Si l'erreur persiste, ajoutez un texte d'intention.";
+            } else if (String(code) === "429") {
+                userMessage = "Trop de requêtes — réessayez dans quelques secondes.";
+            } else if (String(code) === "401" || String(code) === "403") {
+                userMessage = "Clé API invalide ou expirée.";
+            }
+            return NextResponse.json({ error: userMessage }, { status: 200 });
+        }
+
+        const choice = data.choices?.[0];
+        const message = choice?.message;
+        const raw = message?.content?.trim();
 
         if (!raw) {
-            console.error("[explore] No content in response");
-            return NextResponse.json({ error: "Réponse vide du modèle" }, { status: 200 });
+            // Diagnose WHY we got empty content. Common cases:
+            //  1. Anthropic refusal (content moderation) — message.refusal or content_filter finish_reason
+            //  2. finish_reason "length" — max_tokens hit before any output
+            //  3. finish_reason "content_filter" — output filtered post-generation
+            //  4. Tool-call response with no text (shouldn't happen here)
+            const finishReason = choice?.finish_reason || choice?.stop_reason;
+            const refusal = message?.refusal || null;
+
+            console.error(
+                "[explore] Empty content — finish_reason=%s refusal=%s full_response=%s",
+                finishReason,
+                refusal,
+                JSON.stringify(data).slice(0, 800),
+            );
+
+            let userMessage = "Réponse vide du modèle";
+            if (refusal) {
+                userMessage = `Le modèle a refusé la requête : ${refusal}`;
+            } else if (finishReason === "content_filter" || finishReason === "safety") {
+                userMessage = "Requête bloquée par le filtre de contenu Anthropic. Essayez avec une image différente ou ajoutez un texte d'intention.";
+            } else if (finishReason === "length") {
+                userMessage = "Réponse tronquée (limite de tokens). Le prompt système est peut-être trop long pour le modèle.";
+            } else if (finishReason && finishReason !== "stop") {
+                userMessage = `Réponse interrompue (raison : ${finishReason})`;
+            }
+
+            return NextResponse.json({ error: userMessage }, { status: 200 });
         }
 
         // Sonnet may wrap JSON in ```json ... ``` despite the instruction.
