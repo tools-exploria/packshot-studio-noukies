@@ -27,7 +27,7 @@ const BASE_ROLE_OPTIONS = [
 // All complementary references use the same IMAGE_ROLES.existingProduct under the hood;
 // the chips just help the client know what kind of info is useful to write.
 const REF_TYPES = [
-    { value: "detail",   label: "Detail a preserver",  hint: "Crop zoome d'un element (etiquette, hardware, broderie). Astuce: un crop depuis votre photo de base suffit, pas besoin d'une autre photo — le modele dedie plus d'attention au detail zoome." },
+    { value: "detail",   label: "Detail a preserver",  hint: "Crop zoome d'un element (etiquette, hardware, broderie). Astuce: un crop de qualite est recommande, mais meme un crop depuis votre photo de base peut suffire a ameliorer le rendu — le modele dedie plus d'attention au detail zoome." },
     { value: "angle",    label: "Angle non visible",   hint: "Ex: tete du raton laveur vue de face, taupe et creme. Visage du doudou de face si cache sur la base." },
     { value: "material", label: "Texture / Matiere",   hint: "Ex: le velours cotele creme du dos, la mousseline bleue exacte, le coton bio jersey..." },
 ];
