@@ -287,6 +287,34 @@ Routes `/ambiance/scene-builder` et `/ambiance/products-in-scene` accessibles pa
 
 ---
 
+## 🎯 Backlog refacto prompts §14 (marge de manœuvre)
+
+9 prompts n'ont **pas encore** reçu la refacto §14 (énumération exhaustive `PRESERVE EXACTLY` + anchors validés `Maintain exact product proportions...` + `Sharp focus on material texture...`). Tous fonctionnent en l'état actuel — c'est explicitement de la **marge d'amélioration** disponible si un client remonte une régression de fidélité sur un de ces outils.
+
+**Règle quand un client signale un bug de fidélité sur un de ces outils** : consulter cette table AVANT d'investiguer un bug technique — la refacto §14 peut suffire à résoudre.
+
+| Prompt | Outil | Refacto §14 utile si… | Gain attendu |
+|---|---|---|---|
+| `alternateAngle` | `/angles` (caché homepage) | Réactivation de l'outil ; hallucinations sur les détails entre angles | `PRESERVE EXACTLY` par image de réf + anchors §14.4 |
+| `nurseryScene` | `/ambiance` (nursery sans bébé) | Le produit dérive dans la scène (couleur/forme/hardware légèrement altérés) | Bloc `PRESERVE EXACTLY` produit en plus du `BRAND_BRIEF` |
+| `babyScene` | `/ambiance` (avec bébé) | Uncanny valley persistant malgré `BABY_REALISM_RULES`, ou produit qui dérive | Anchors §14.4 + énumération produit explicite |
+| `outdoorScene` | `/ambiance` (extérieur) | Produit dérive dans la scène extérieure | Idem nurseryScene |
+| `ambianceCustom` | `/ambiance` (prompt libre) | Le produit « fond » dans la scène, perd identité | Bloc `PRESERVE EXACTLY` autour du wrapper utilisateur |
+| `product3D` | `/creation` tab 3D Produit | Détails du tissu ou de la fiche technique mal reproduits | Anchors §14.4 + énumération hardware sur la fiche technique |
+| `roomScene` | `/ambiance/room-scene` | Un ou plusieurs produits dérivent ou hallucinent dans la chambre | `PRESERVE EXACTLY` PAR produit (énumération individuelle) |
+| `sceneFromReference` | `/ambiance/scene-builder` (caché par flag) | Régen de scène casse la géométrie de la réf | Refacto §14 à faire AVANT d'activer le flag preview-agents |
+| `productsInScene` | `/ambiance/products-in-scene` (caché par flag) | Produits pas fidèles dans la scène inspirée | Refacto §14 à faire AVANT d'activer le flag preview-agents |
+
+**Méthode de refacto (à appliquer SI un client remonte un problème) :**
+1. Lire `lib/PROMPT_GUIDELINES.md` §14 (obligatoire — sauvegardé en mémoire auto comme règle dure)
+2. Appliquer le pattern qu'on a déjà validé sur 6 autres prompts : `PRESERVE EXACTLY:` (énumération exhaustive de tout ce qui doit rester intact) + `DO NOT:` (négations explicites) + les 2 anchors §14.4 placés dans le bloc d'application mode-spécifique
+3. **Mesurer avant/après sur ≥8 générations** d'un cas hard avant de committer — la session précédente nous a appris que 3/8 vs 4/8 est dans le bruit, il faut un signal franc
+4. Un commit séparé par prompt pour limiter le blast radius si régression
+
+**Prompts déjà refactorisés en §14 (2026-05-25)** pour mémoire : `applyPattern`, `solidColor`, `applyTexture`, `applyEmbroidery`, `sketchToPackshot`, `pliage`. Plus le wrapper anti-drift `handleEditImage` (§14.6) sur toutes les éditions inline.
+
+---
+
 ## ⚠️ Limites connues / TODO
 
 1. **`/angles` masqué** — code conservé, retiré de la homepage et de la NavLinks à la demande du client. À ré-activer en décommentant `MODES[]` dans `app/page.js` et `NAV_LINKS[]` dans `components/NavLinks.jsx`.
