@@ -1088,3 +1088,42 @@ Before writing or modifying ANY prompt in `lib/prompts.js`, verify ALL of these:
 **Hard rule applied across the project (saved as memory `feedback_prompt_writing`):**
 ALWAYS read §14 before writing or modifying any prompt. No exception.
 
+### 14.11 Crop-as-detail-anchor strategy
+
+> **Discovered empirically 2026-05-25 on the Noukies doudou test case.** Adding zoomed
+> crops of specific details from the SAME source image (no new photo) — uploaded as
+> complementary references — measurably improved fidelity from ~0-3/8 to 5/8 on a hard
+> case where the central element was occluded. The crops contained no new pixel data;
+> they simply concentrated attention on the elements that were drifting.
+
+**Why it works:** NB2's vision encoder tokenizes input images at fixed patch resolution.
+After internal downsampling (likely ~768-1024px on the long edge), small details may
+only occupy 2-3 attention patches. The same detail cropped and zoomed to fill a 512px
+crop image occupies ~80 patches — roughly 25-30× more "visual bandwidth" dedicated to
+that detail, without any new information needed.
+
+This matches the "Visual Prompting with Crops" and "Multi-Scale Vision Transformer"
+literature, applied as a user-facing workflow.
+
+**When to recommend the workflow to the client:**
+
+1. Client gets hallucinations on fine details (small labels, hardware, embroidery, plush
+   appliqué faces) on their initial generation
+2. Client opens the original photo and crops a zoomed rectangle (~512px) around each
+   problematic detail
+3. Client uploads each crop as a complementary reference with role *Détail à préserver*
+   and a one-line description ("Étiquette CE haut-droite", "Hochet plastique bleu")
+
+**Why the crop must come from the SAME source image (not a different shot):**
+- Lighting matches automatically — no color drift between sources
+- The model sees the same pixel for the same element across views
+- No risk of cross-contamination from a different product version, batch, or angle
+
+**Diminishing returns:** beyond 3-4 detail crops, fidelity gain flattens. Stick to the
+3-4 most problematic details rather than cropping everything.
+
+**Why we don't auto-crop:** an "Auto-crop the 4 corners" button is technically trivial
+(~30 min, sharp server-side or Canvas client-side) but would dilute attention with
+non-essential crops. Client-driven selection of which details matter is more efficient.
+Revisit if clients consistently crop the same N corners on every product.
+
