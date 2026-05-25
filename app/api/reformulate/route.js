@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import sharp from "sharp";
 
 /**
  * POST /api/reformulate
@@ -398,6 +399,35 @@ function buildContextBrief(context) {
     `JAMAIS son intention par autre chose.`;
 }
 
+/**
+ * Anthropic recommends ≤1568px on the long edge. The Reformulable component
+ * passes the raw productPreview (uncompressed FileReader output), which can
+ * easily be 4K from a smartphone packshot — exceeding OpenRouter / Anthropic
+ * limits and producing an opaque "Provider returned error 400". Compress
+ * defensively. Images already small pass through untouched.
+ */
+async function compressImageForAnthropic(b64) {
+    const sizeKB = Math.round(b64.length / 1024);
+    if (sizeKB < 1200) {
+        console.log(`[reformulate] image ${sizeKB}KB — pass-through (under 1200KB)`);
+        return b64;
+    }
+    try {
+        const buffer = Buffer.from(b64, "base64");
+        const compressed = await sharp(buffer)
+            .rotate()
+            .resize(1568, 1568, { fit: "inside", withoutEnlargement: true })
+            .jpeg({ quality: 85, mozjpeg: true })
+            .toBuffer();
+        const newSizeKB = Math.round(compressed.length / 1024 * 4 / 3);
+        console.log(`[reformulate] image ${sizeKB}KB → ${newSizeKB}KB after sharp compression`);
+        return compressed.toString("base64");
+    } catch (err) {
+        console.warn("[reformulate] image compression failed, sending as-is:", err.message);
+        return b64;
+    }
+}
+
 export async function POST(request) {
     try {
         if (!API_KEY) {
@@ -408,9 +438,9 @@ export async function POST(request) {
         }
 
         const body = await request.json();
-        const { text = "", context = {}, image } = body;
+        const { text = "", context = {}, image: rawImage } = body;
 
-        if (!text.trim() && !image) {
+        if (!text.trim() && !rawImage) {
             return NextResponse.json(
                 { error: "Champ vide et aucune image fournie — rien à reformuler" },
                 { status: 400 },
@@ -420,7 +450,9 @@ export async function POST(request) {
         const userContent = [];
 
         // Image en premier si fournie (Claude vision préfère cet ordre)
+        let image = rawImage;
         if (image) {
+            image = await compressImageForAnthropic(image);
             userContent.push({
                 type: "image_url",
                 image_url: { url: `data:image/jpeg;base64,${image}` },
@@ -479,14 +511,45 @@ export async function POST(request) {
         }
 
         const data = await res.json();
+
+        // OpenRouter can return HTTP 200 OK with an error object in the body
+        // when the upstream provider returned a non-success (e.g., Anthropic 400).
+        // Detect this and surface a useful message rather than falling through
+        // to "Réponse vide du modèle" which gives no actionable info.
+        if (data.error) {
+            const err = data.error;
+            const code = err.code || err.status || "?";
+            const msg = err.message || JSON.stringify(err);
+            console.error(`[reformulate] Provider error code=${code} msg=${msg} full=${JSON.stringify(data).slice(0, 500)}`);
+
+            let userMessage = `Erreur du fournisseur (code ${code}) : ${msg}`;
+            if (String(code) === "400") {
+                userMessage = "Erreur 400 — image probablement trop volumineuse ou format non supporté. Réessayez.";
+            } else if (String(code) === "429") {
+                userMessage = "Trop de requêtes — réessayez dans quelques secondes.";
+            } else if (String(code) === "401" || String(code) === "403") {
+                userMessage = "Clé API invalide ou expirée.";
+            }
+            return NextResponse.json({ error: userMessage }, { status: 200 });
+        }
+
         const result = data.choices?.[0]?.message?.content?.trim();
 
         if (!result) {
-            console.error("[reformulate] No content in response");
-            return NextResponse.json(
-                { error: "Réponse vide du modèle" },
-                { status: 200 },
+            const choice = data.choices?.[0];
+            const finishReason = choice?.finish_reason || choice?.stop_reason;
+            const refusal = choice?.message?.refusal || null;
+            console.error(
+                `[reformulate] Empty content — finish_reason=${finishReason} refusal=${refusal} full=${JSON.stringify(data).slice(0, 500)}`,
             );
+            let userMessage = "Réponse vide du modèle";
+            if (refusal) userMessage = `Refus du modèle : ${refusal}`;
+            else if (finishReason === "content_filter" || finishReason === "safety") {
+                userMessage = "Requête bloquée par le filtre de contenu. Essayez une image différente ou ajoutez un texte d'intention.";
+            } else if (finishReason === "length") {
+                userMessage = "Réponse tronquée (limite de tokens).";
+            }
+            return NextResponse.json({ error: userMessage }, { status: 200 });
         }
 
         console.log(`[reformulate] OK — ${result.length} chars`);

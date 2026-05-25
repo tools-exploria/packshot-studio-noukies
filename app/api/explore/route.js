@@ -301,11 +301,16 @@ export async function POST(request) {
             });
         }
 
+        const userText = text.trim();
         userContent.push({
             type: "text",
-            text:
-                `Intention utilisateur (génère 5 directions créatives distinctes) :\n\n` +
-                (text.trim() || "(champ vide — propose 5 directions à partir de l'image et de la charte Noukies)"),
+            text: userText
+                ? `Intention utilisateur (génère 5 directions créatives distinctes) :\n\n${userText}`
+                : `Champ vide — l'utilisateur n'a fourni aucun texte d'intention.\n\n` +
+                  `⚠️ LANGUE OBLIGATOIRE : FRANÇAIS pour les 5 cartes (titre, anchor, prompt). ` +
+                  `Aucune carte en anglais. Termes techniques photo en anglais OK comme ancres inline ` +
+                  `("golden hour", "f/4", "Kodak Portra 400") mais enchâssés dans des phrases françaises.\n\n` +
+                  `Propose 5 directions créatives en français à partir de l'image fournie et de la charte Noukies.`,
         });
 
         const fullSystem = SYSTEM_PROMPT + buildContextBrief(context);
