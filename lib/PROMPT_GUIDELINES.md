@@ -1127,3 +1127,41 @@ literature, applied as a user-facing workflow.
 non-essential crops. Client-driven selection of which details matter is more efficient.
 Revisit if clients consistently crop the same N corners on every product.
 
+### 14.12 Where to enable the 🎨 Explorer button (and where NOT to)
+
+> **Discovered empirically 2026-05-26.** The Explorer generates full creative
+> directions (recipes R1-R15 applied to product visual elements). This only fits
+> when the user's input IS the entire prompt sent to NB2. On fields where the
+> user's text is injected as one line of a larger structured prompt, Explorer's
+> output contradicts the surrounding prompt scaffolding and produces incoherent
+> generations.
+
+**Rule:** enable `enableExplore` ONLY on fields where the user's text IS the full
+prompt (or the bulk of it) sent to NB2.
+
+| Field | Used as… | Explorer enable? |
+|---|---|---|
+| `/labo` freePrompt | Entire prompt sent as-is to NB2 | ✅ Yes |
+| `/ambiance` customPrompt | Full scene description (wrapper only adds BRAND_BRIEF + product fidelity) | ✅ Yes |
+| `/ambiance` mood (nursery / baby / outdoor) | ONE line injected into a scene template that already fixes setting, lighting, camera | ❌ No |
+| `/ambiance/room-scene` mood | ONE line injected into a room-scene template with fixed setting and camera | ❌ No |
+| `notes` (everywhere) | Technical disambiguation appended to a complete agent prompt | ❌ No |
+| `description` (manifest labels) | Functional label, 10-25 words max | ❌ No |
+| `editPrompt` | Wrapped by §14.6 anti-drift template server-side | ❌ No |
+| `placement` (broderie) | Spatial anchor injected into embroidery prompt | ❌ No |
+| `sceneTweaks` | Tweaks on an existing scene reference, not full creative direction | ❌ No |
+
+For all the ❌ fields, the **simple ✨ Reformuler** button still applies — it
+expands/structures the user's intention without dictating a full creative frame,
+so it cohabits cleanly with the surrounding agent prompt.
+
+**Concrete failure example (May 2026):** user typed "collection cowboy" in the
+mood field of `/ambiance` baby_scene. Explorer's R9 card returned
+"70% du cadre est un ciel de prairie au crépuscule, gradient cream → bleu-gris…"
+which directly contradicted the babyScene prompt's fixed "Setting: A cozy nursery"
+and "Lighting: Soft diffused natural light" → bouillie côté NB2.
+
+**When adding a new agent**, check whether the new text input field is a free-form
+slot (full prompt) or a structured injection (one line). Only the first kind gets
+`enableExplore` on its `ReformulableInput` / `ReformulableTextarea`.
+
