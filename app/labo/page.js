@@ -155,6 +155,7 @@ export default function LaboPage() {
                                 className="min-h-[180px]"
                                 context={{ agent: "labo", role: "freePrompt" }}
                                 image={productPreview?.split(",")[1]}
+                                enableExplore
                             />
                         </CardContent>
                     </Card>

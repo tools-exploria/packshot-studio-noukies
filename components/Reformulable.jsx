@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Sparkles, Undo2, Loader2 } from "lucide-react";
+import { ExplorerButton } from "./Explorer";
 
 /**
  * Feature flag — la reformulation IA est masquée par défaut.
@@ -13,9 +14,11 @@ const REFORMULATE_ENABLED = process.env.NEXT_PUBLIC_ENABLE_REFORMULATE === "true
 
 /**
  * Toolbar partagée : bouton ✨ Reformuler + bouton ↶ Undo persistant.
+ * Si enableExplore=true, ajoute aussi un bouton 🎨 Explorer qui ouvre un panel
+ * de 5 directions créatives à choisir (modes mood/customPrompt/freePrompt).
  * Placée AU-DESSUS de l'input, alignée à droite.
  */
-function ReformulateToolbar({ value, onChange, context, image }) {
+function ReformulateToolbar({ value, onChange, context, image, enableExplore }) {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [previousValue, setPreviousValue] = useState(null);
@@ -62,6 +65,12 @@ function ReformulateToolbar({ value, onChange, context, image }) {
             ? "Écrivez d'abord une intention dans le champ avant de reformuler"
             : "Reformuler avec l'IA (Sonnet 4.6 + recettes NB2)";
 
+    // Wrapper onChange used by Explorer so picking a card also enables Undo
+    const handleExplorerApply = (newValue) => {
+        setPreviousValue(value);
+        onChange(newValue);
+    };
+
     return (
         <div className="flex items-center justify-end gap-1.5 mb-1">
             {previousValue !== null && !loading && (
@@ -77,6 +86,14 @@ function ReformulateToolbar({ value, onChange, context, image }) {
                     <Undo2 className="w-3 h-3" />
                     Annuler
                 </button>
+            )}
+            {enableExplore && (
+                <ExplorerButton
+                    value={value}
+                    onChange={handleExplorerApply}
+                    context={context}
+                    image={image}
+                />
             )}
             <button
                 type="button"
@@ -130,6 +147,7 @@ export function ReformulableTextarea({
     context,
     image,
     disableReformulate = false,
+    enableExplore = false,
     className = "",
     rows = 3,
     ...textareaProps
@@ -147,6 +165,7 @@ export function ReformulableTextarea({
                     onChange={onChange}
                     context={context}
                     image={image}
+                    enableExplore={enableExplore}
                 />
             )}
             <textarea
@@ -177,6 +196,7 @@ export function ReformulableInput({
     context,
     image,
     disableReformulate = false,
+    enableExplore = false,
     className = "",
     onKeyDown,
     ...inputProps
@@ -194,6 +214,7 @@ export function ReformulableInput({
                     onChange={onChange}
                     context={context}
                     image={image}
+                    enableExplore={enableExplore}
                 />
             )}
             <textarea
@@ -211,3 +232,4 @@ export function ReformulableInput({
         </div>
     );
 }
+

@@ -204,6 +204,7 @@ export default function AmbiancePage() {
                                         placeholder="Ex: lumière dorée du matin, ambiance cocooning..."
                                         context={{ agent: "ambiance", role: "mood", extras: { sceneType: "nursery_scene", placement: productPlacement } }}
                                         image={productPreview?.split(",")[1]}
+                                        enableExplore
                                     />
                                 </div>
                             </div>
@@ -229,6 +230,7 @@ export default function AmbiancePage() {
                                         placeholder="Ex: tendre et paisible, moment de jeu..."
                                         context={{ agent: "ambiance", role: "mood", extras: { sceneType: "baby_scene", babyAge } }}
                                         image={productPreview?.split(",")[1]}
+                                        enableExplore
                                     />
                                 </div>
                             </div>
@@ -254,6 +256,7 @@ export default function AmbiancePage() {
                                         placeholder="Ex: lumière fraîche du matin, ambiance automnale..."
                                         context={{ agent: "ambiance", role: "mood", extras: { sceneType: "outdoor_scene", outdoorType } }}
                                         image={productPreview?.split(",")[1]}
+                                        enableExplore
                                     />
                                 </div>
                             </div>
@@ -275,6 +278,7 @@ export default function AmbiancePage() {
                                     className="min-h-[100px]"
                                     context={{ agent: "ambiance-custom", role: "customPrompt" }}
                                     image={productPreview?.split(",")[1]}
+                                    enableExplore
                                 />
                             </div>
                         )}

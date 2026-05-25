@@ -229,6 +229,7 @@ export default function RoomScenePage() {
                                 onChange={setSceneMood}
                                 placeholder="Ex: lumière dorée du matin, ambiance cocooning, tons chauds..."
                                 context={{ agent: "ambiance-room-scene", role: "mood" }}
+                                enableExplore
                             />
                         </CardContent>
                     </Card>
