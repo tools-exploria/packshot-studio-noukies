@@ -893,3 +893,198 @@ These are the ways NB2 fails creatively that don't appear in §10 (which covers 
 | Texture flat / plasticky | Generic material noun | Apply R4 — full textile recipe |
 | Theme reads as cliché (cowboy = hat + boots) | NB2 defaults to symbol-stacking | Anchor in light/palette/material (§13.2), not object inventory |
 
+---
+
+## 14. Validated Production Techniques (May 2026 web research)
+
+> **Why this section exists.** This is the consolidated, externally-validated playbook for NB2
+> product photography fidelity. Every technique here comes from production users who reported
+> measurable success rates (not internal speculation). Treat this section as **the mandatory
+> pre-flight checklist** before writing or modifying any prompt in `lib/prompts.js`.
+>
+> Sources: Google Cloud official guide, Google DeepMind model card, LaoZhang AI e-commerce guide,
+> Fliki Playbook, DEV.to (official Google AI account), Magnific, awesome-nanobanana-pro repo,
+> OpenRouter benchmarks, VentureBeat enterprise analysis. Last consolidated: 2026-05-25.
+
+### 14.1 Model selection — confirmed current as of May 2026
+
+We are on the **latest available image generation models**. No Gemini 3.5 Flash Image, no
+Gemini 4, no Nano Banana 3 exists yet. The OpenRouter catalog ranks:
+
+| Model ID | Codename | Release | Use when |
+|---|---|---|---|
+| `google/gemini-3.1-flash-image-preview` | Nano Banana 2 | Feb 26, 2026 | **Default for everything.** #1 on Text-to-Image benchmarks. ~3s for 2K. |
+| `google/gemini-3-pro-image-preview` | Nano Banana Pro | Nov 20, 2025 | Edits via `handleEditImage()`. 94-96% text rendering accuracy. Critical text-heavy assets. |
+| `google/gemini-2.5-flash-image` | Nano Banana 1 | older | Don't use — superseded. |
+
+Google's own guidance: *"For almost all new projects, Nano-Banana 2 should be your immediate
+default. Only escalate to Pro when you hit consistent failures."* Our current setup (Flash for
+generation, Pro for inline edits) matches this exactly.
+
+**Re-verify quarterly.** When a new Gemini image model appears on OpenRouter, update
+`ALLOWED_MODELS` in `app/api/generate/route.js`.
+
+### 14.2 The validated preservation formula
+
+> *"The more you list, the more identity survives the edit."* — Fliki Playbook
+
+The single most consistent finding across all sources: **explicit listing of what to preserve
+beats abstract directives**. Use both keywords `preserve` and `maintain`, then enumerate
+exhaustively.
+
+**Validated formula:**
+```
+Preserve [element 1], [element 2], [element 3], ..., [element N] exactly.
+Maintain [overall attribute 1], [overall attribute 2], ...
+Do NOT modify [explicit list of things people commonly want to fix but you don't].
+```
+
+**Concrete example for a Noukies doudou:**
+```
+Preserve the exact 4 corner illustration tabs (raccoon, feather, fox illustration, leaf),
+the woven "noukies" brand label at the top-right, the CE marking at the top, the blue
+plastic ring on the left, the transparent rattle on the right, the star teether at the
+bottom, and every visible stitching line. Maintain the exact muslin texture, the exact
+shade of blue-grey of the fabric, and the exact position and orientation of every element.
+Do NOT add, remove, simplify, relocate, or invent any tag, label, marking, or accessory.
+```
+
+This is more verbose than our current PIXEL-PERFECT directive — and that's the point.
+**Exhaustive enumeration is the technique with the highest validated success rate.**
+
+### 14.3 Product-first framing (anti-IMAGE_SAFETY + anti-stylization)
+
+Per LaoZhang AI's tested-on-thousands-of-images guide: **frame the subject as the product,
+not the wearer/context.**
+
+| ❌ Triggers stylization or filters | ✅ Tested production framing |
+|---|---|
+| "A baby in a sleeping bag" | "Editorial product photography of the Noukies sleeping bag, displayed on a neutral form" |
+| "A model wearing pyjamas" | "Ecommerce catalog image of children's pyjamas on a mannequin" |
+| "The doudou next to a baby" | "Lifestyle product photography of the Noukies doudou, with a softly out-of-focus baby silhouette suggested" |
+
+**Why it works:** the model has a "product photography" prior baked in from training. Saying
+the words activates the relevant rendering pathway. It also reduces IMAGE_SAFETY false
+positives on lifestyle images including babies.
+
+### 14.4 Validated production keyword anchors
+
+These exact phrasings, validated across production users, anchor specific behaviors. Use them
+verbatim when relevant.
+
+| Phrase | Anchors |
+|---|---|
+| **"Maintain exact product proportions, colors, and surface textures"** | Universal fidelity directive — works for any product edit |
+| **"Product fills 80% of frame"** | Scale accuracy on packshots |
+| **"Sharp focus on material texture and construction details"** | Detail rendering — fabric weave, stitching, hardware grain |
+| **"Three-point studio lighting setup with key light at 45 degrees, fill light opposite, hair light from above"** | Prevents stylization drift in packshots |
+| **"Subtle ground shadow for depth"** | Studio packshot anchor — better than just "white background" |
+| **"4K resolution. Commercial catalog style."** | Quality signal — semantic anchor that improves output |
+| **"Same white background and lighting setup as reference"** | For multi-angle series consistency |
+| **"Match the exact product appearance, color, and material from the reference images"** | For any multi-ref workflow |
+| **"Editorial fashion photography"** | Legitimate-intent signal — reduces filter false positives |
+
+**Two rules when using anchors:**
+1. **Add them where they fit, don't stuff.** Each anchor should earn its place by addressing
+   a specific failure mode of the prompt.
+2. **Don't combine contradictory anchors.** "Three-point studio lighting" + "natural window
+   light" produces mush.
+
+### 14.5 Multi-reference workflow — the angle-sequential method
+
+For generating multiple consistent views of the same product (e.g., front + 3/4 + back +
+detail), the validated method is:
+
+1. Generate the **first angle** using the original reference + a strict product-fidelity prompt
+2. Use the **output of step 1** as a NEW reference image for step 2
+3. In step 2's prompt, write: *"Match the exact product appearance, color, and material from
+   the reference images. Same white background and lighting setup as reference. Commercial
+   product catalog consistency."*
+4. Repeat for each angle, always including the **first generation** plus the latest
+
+**Why it works:** the model treats its own previous outputs as the new ground truth, drifting
+less than if you regenerate from scratch each time.
+
+**Token budget:** the model processes up to 14 reference images, but fidelity is highest with
+≤3 high-fidelity refs. For >3 angle series, drop earlier outputs after they've anchored the
+style.
+
+### 14.6 Editing workflow — separate preservation and modification zones
+
+From awesome-nanobanana-pro curated patterns, validated on hundreds of edits:
+
+**Editing template:**
+```
+task: edit-image: [single specific change]
+
+Only modify: [the specific zone or attribute being changed].
+Do not change: [exhaustive list of everything else — pose, anatomy, proportions,
+clothing details, shading, scene elements, color, lighting, background, ...].
+```
+
+The explicit "Only modify [X]. Do not change [Y, Z, ...]" pattern dramatically reduces
+collateral drift on edits. Our current `handleEditImage()` flow could benefit from a wrapper
+that injects this template around the user's edit text.
+
+### 14.7 Anti-patterns — confirmed reductions in quality
+
+These five anti-patterns are independently reported by 4+ sources as actively degrading
+quality. **Never use these in `lib/prompts.js`.**
+
+1. **Keyword stacking** — "Portrait, woman, cafe, cinematic, 8k" REDUCES quality vs a
+   natural sentence. Comma-separated keyword lists trigger NB2's lowest-quality pathway.
+2. **Burying critical details past first 15 words** — first 15 words get the highest weight.
+   Put the most important directive (fidelity, subject) at the very top.
+3. **Contradictory styles** — "Photorealistic anime oil painting watercolor" produces
+   hybrid mush. Pick one anchor per prompt.
+4. **Generic language** — "realistic", "good lighting", "high quality" carry zero
+   information for NB2. Always specify concretely.
+5. **Excessive regeneration loops** — if a prompt fails 3+ times, the prompt is the problem,
+   not the model. Stop, refactor, then retry.
+
+### 14.8 Visual grounding — when and when not to use
+
+NB2 can search the web for real-world images during generation (toggle in API). Validated
+use cases:
+
+✅ **Use grounding when:** referencing specific architecture, real locations, animal
+species, plant biology, named products from other brands (Bonpoint, Petit Bateau campaign
+references).
+
+❌ **Never use grounding for:** specific real people (search can't ground on persons), or
+when fidelity to an uploaded reference is the priority (grounding can leak external
+colors/styles).
+
+Currently `app/api/generate/route.js` doesn't expose a grounding toggle. Worth adding when
+the `ambianceCustom` mode receives a brief like "ambiance Bonpoint hiver 2024".
+
+### 14.9 Thinking mode (`thinkingLevel`)
+
+Validated default: **OFF** (`"minimal"`). Activate `"High"` only for:
+- Complex spatial compositions (multi-product rooms, intricate flat-lays)
+- Text-heavy infographics
+- When the model produces nonsensical outputs that suggest it didn't "reason" about constraints
+
+Trade-off: 2-5x latency + cost. Not currently wired in `app/api/generate/route.js` — would
+be a small addition with a toggle in `GenerationControls`.
+
+### 14.10 Mandatory pre-flight checklist
+
+Before writing or modifying ANY prompt in `lib/prompts.js`, verify ALL of these:
+
+- [ ] Read §14.2 (preservation formula) — does the prompt enumerate what to preserve, or
+      does it rely only on PIXEL-PERFECT? Enumeration beats abstraction.
+- [ ] Read §14.4 (validated anchors) — are there phrasings from the table that fit this
+      prompt's failure modes?
+- [ ] Read §14.7 (anti-patterns) — does the prompt contain keyword stacking, contradictory
+      styles, or generic language? Strip them.
+- [ ] First 15 words rule — is the single most critical fidelity directive in the first 15
+      words?
+- [ ] Length budget — under 400 words total? Closer to 200-300 for product edits, 300-400
+      for lifestyle scenes.
+- [ ] Test plan — what's the minimum sample to validate (typically 8 generations on a known
+      hard case) and what's the target success rate?
+
+**Hard rule applied across the project (saved as memory `feedback_prompt_writing`):**
+ALWAYS read §14 before writing or modifying any prompt. No exception.
+
