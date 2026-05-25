@@ -209,6 +209,11 @@ export function useGenerationPage({
      * Edit a specific generated image variant using a text instruction.
      * Appends the new image at the end of the list (non-destructive).
      *
+     * The user's instruction is wrapped in the validated "Only modify / Do not change"
+     * template (PROMPT_GUIDELINES.md §14.6) to prevent collateral drift on inline edits
+     * — colour shifts on untouched elements, hardware drift, lighting changes, fabric
+     * texture softening across re-edits.
+     *
      * @param {number} idx   - Index of the image to edit
      * @param {string} model - MODELS.FLASH | MODELS.PRO
      */
@@ -219,8 +224,23 @@ export function useGenerationPage({
         try {
             // Compress the source image to stay under Vercel's 4.5 MB body limit
             const compressedB64 = await compressBase64Image(generatedImages[idx], "image/png");
+
+            // Wrap user's edit in the §14.6 template — silent UX, big anti-drift impact.
+            const wrappedPrompt = `task: edit-image: ${editPrompt.trim()}
+
+Only modify the requested change above.
+
+Do not change anything else:
+- Product shape, proportions, silhouette, and 3D form.
+- Fabric texture, weave, and material rendering.
+- All colours except the one explicitly mentioned in the change.
+- All visible hardware: snaps, buttons, ribbons, labels, tags, zippers, stitching lines.
+- Background, lighting direction and intensity, contact shadows.
+- Camera angle, framing, and composition.
+- Any baby, person, or scene element if present.`;
+
             const results = await generateImages({
-                prompt: editPrompt.trim(),
+                prompt: wrappedPrompt,
                 images: [compressedB64],
                 count: 1,
                 model,
