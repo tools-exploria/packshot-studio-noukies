@@ -169,6 +169,8 @@ export default function ProduitTab() {
                                 notesPlaceholder="Ex: Le tissu doit envelopper le produit de manière réaliste. Les coutures doivent être visibles."
                                 generateLabel="visualisation 3D"
                                 onGenerate={handleGenerate}
+                                agent="creation-3d"
+                                contextImage={productPreview?.split(",")[1]}
                             />
                         )}
 
@@ -183,6 +185,7 @@ export default function ProduitTab() {
                             onDownload={(i) => downloadImage(generatedImages[i], pipeline.getFileName(i))}
                             onGenerate={handleGenerate}
                             onExport={() => setStep(3)}
+                            agent="creation-3d"
                         />
 
                         <Button variant="outline" onClick={() => setStep(1)} className="w-full">← Retour</Button>

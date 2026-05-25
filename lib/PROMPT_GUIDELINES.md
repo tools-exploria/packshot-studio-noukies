@@ -642,3 +642,254 @@ ${OUTPUT_QUALITY}
 
 For lifestyle/ambiance modes, replace `CRITICAL_RULES` + `PRESERVE_RULES` + `OUTPUT_QUALITY`
 with `BRAND_BRIEF` + product fidelity section + narrative output description.
+
+---
+
+## 13. Creative Recipes for NB2
+
+> **Why this section exists.** NB2 has a default behaviour: centered subject, neutral lighting,
+> generic composition. This is fine for catalogue packshots, but kills creative requests like
+> "présente le produit pour la collection cowboy" or "fais quelque chose d'original".
+> This section catalogues **model-specific levers** that reliably push NB2 away from its default
+> — not generic photography tips (those live in §4). Each recipe is a tested phrase pattern
+> that the model responds to. Used by the prompt reformulator (`/api/reformulate`) to source
+> creative ideas when the user signals a creative intent.
+
+### 13.1 How NB2 reads a creative brief
+
+Three things matter more than length:
+
+1. **Lead with the *unexpected* element, not the subject.** NB2 weights early tokens heavily.
+   "Macro detail of a single brass snap, the entire baby blanket out of focus behind it" beats
+   "A baby blanket photographed with a macro detail on the brass snap." Same instruction,
+   different default.
+
+2. **Name an established visual tradition rather than describing it.** "Shot like a Dieter Rams
+   product still life" produces sharper output than 4 lines describing minimalist studio lighting.
+   The model has rich internal references for named traditions — abuse them.
+
+3. **Spatial language is honoured.** Unlike older models, NB2 understands "the bib in the front
+   third of the frame, the wooden rabbit toy out of focus behind it, both off-center to the left."
+   You can compose like a director, not a tagger.
+
+### 13.2 The 5-part creative anchor
+
+For any thematic series ("cowboy collection", "marine collection", "vintage 70s"), build a
+**reusable anchor sentence** and prepend it to every variant prompt. NB2 develops a "house style"
+when the same phrasing recurs across generations.
+
+```
+[STYLE ANCHOR]: "Editorial baby fashion still life, [theme noun] aesthetic,
+ [signature lighting], [signature palette], shot on [signature film/camera],
+ [signature mood adjective]."
+```
+
+Example:
+```
+[STYLE ANCHOR]: Editorial baby fashion still life, neo-western aesthetic,
+golden afternoon backlight through a dusty window, palette of cream/saddle-tan/sun-bleached
+sage, shot on Kodak Portra 400, quietly nostalgic.
+```
+
+Reuse this anchor *verbatim* across 5 variants — NB2 will hold the series together far better
+than any single long descriptive prompt.
+
+### 13.3 The recipes
+
+Each recipe = a named creative move with the NB2-specific phrasing that triggers it.
+
+#### R1 — Hardware Switch
+Swap NB2's default "clean digital studio" look by **naming a specific camera**.
+Each name triggers a different visual DNA — not just a filter, but framing habits too.
+| Phrase | Effect on output |
+|---|---|
+| `shot on a disposable film camera, on-camera flash` | Raw, slightly overexposed foreground, dark falloff, nostalgia |
+| `shot on a Fujifilm X100, classic chrome simulation` | Editorial documentary feel, muted greens, soft contrast |
+| `shot on a Hasselblad 500CM with 80mm planar, medium-format film` | Square-format heritage, creamy bokeh, "luxury heritage" mood |
+| `shot on an iPhone 15 Pro, raw HDR, ambient light` | Hyper-real, slightly cool, social-native authenticity |
+| `shot on a Leica M6 with a 35mm Summicron, Tri-X 400 push-2` | High-contrast B&W, street-photo intimacy |
+
+**Trap.** Don't combine two cameras in one prompt — NB2 averages them and loses both.
+
+#### R2 — Off-Center Forcing
+NB2 centers the subject 9 times out of 10. To break it, **specify thirds and negative space**
+in the same sentence:
+> "Subject in the **left third of the frame**, **right two-thirds intentionally empty**,
+> negative space filled with **out-of-focus warm wall texture**."
+
+The two-part instruction (where the subject *is* + what the empty side *contains*) is what
+prevents NB2 from "rebalancing" the composition.
+
+**Trap.** Saying only "off-center" produces a *slightly* off-center subject. Force it with thirds.
+
+#### R3 — Director's Reference
+Reference an **established visual tradition by name** rather than describing it. NB2 has dense
+internal embeddings for canonical styles.
+
+| Use this | Get this |
+|---|---|
+| `Wes Anderson symmetrical centered composition, pastel palette` | Storybook stillness, soft pastels, frontal symmetry |
+| `Dieter Rams-era industrial still life` | Clean greys, soft top lighting, product-as-object |
+| `Petit Bateau campaign photography circa 2018` | Soft naturals, parisian intimacy, off-white walls |
+| `Bonpoint editorial, Paris atelier light` | Heritage, muted creams, soft window light |
+| `Annie Leibovitz portrait staging, theatrical depth` | Cinematic depth, narrative composition |
+| `Slim Aarons summer holiday color palette` | Saturated sun, blue/cream/red, leisure mood |
+| `Tim Walker fashion fairy-tale staging` | Dreamlike, over-styled props, fantasy mood |
+
+**Trap.** Never combine two contradictory references ("Wes Anderson meets film noir"). NB2
+averages them into mush. Pick one anchor per prompt.
+
+#### R4 — Material Lock
+Instead of "soft fabric", **name the exact textile + finish + weight**. NB2 has surprisingly
+good material discrimination when you commit:
+> "**Organic cotton jersey, 220 gsm**, **soft brushed inside finish**, visible knit loops on
+> the surface, gentle stretch where the seam pulls."
+
+Recipe: `[fibre] + [knit/weave structure] + [weight/gsm] + [finish] + [behaviour under stress]`.
+
+**Trap.** "Luxurious fabric" is meaningless to NB2. Always commit to a real textile.
+
+#### R5 — Cutout Typography
+NB2 renders text well *as a window onto another image*. Powerful for collection covers:
+> "Typographic poster, **bold black letters spell 'COWBOY'** filling the frame, the **letterforms
+> are cut-out windows revealing a photograph of the baby blanket** placed in a dusty western
+> landscape with golden hour light. Background outside the letters: pure solid cream."
+
+**Trap.** Limit to one short word (≤8 chars) and one font instruction. Multi-word cutouts
+collapse.
+
+#### R6 — Macro Detail Hero
+Push the product to **subject of a macro shot** rather than centered packshot. Pattern:
+> "Extreme macro close-up of [**single specific element** of the product], **shot at 1:1 reproduction
+> ratio**, **f/4 with the rest of the product completely out of focus**, **fine fibre texture
+> visible**, ambient soft window light."
+
+Best for: collection campaigns where you need 5 hero shots of "one detail each" of the same
+product. Each detail prompt = a different variant, same series consistency.
+
+**Trap.** Without "completely out of focus" NB2 still tries to keep the whole product readable.
+
+#### R7 — Environmental Storytelling
+The product is **passively present** in a moment, not the centered hero. Pattern:
+> "**A moment of [activity]** in [setting]. **In the [position] of the frame**, [product]
+> sits [naturally / draped / forgotten / placed with care]. **The viewer's eye is drawn to
+> [emotional anchor]** — a half-empty cup of coffee, light pouring through a window, etc."
+
+NB2 produces evocative, less-product-centric images that feel like real lifestyle photography
+rather than catalogue.
+
+**Trap.** Always specify *where* the product is in the frame or NB2 will center it anyway.
+
+#### R8 — Spatial Storyboard
+NB2 honours **multi-element spatial relations** ("X to the left of Y, Z behind, W reflected
+in V"). Use it for editorial compositions:
+> "**Foreground**, slightly left of center: the swaddle laid flat on a wooden floor.
+> **Middle ground**, blurred: a pair of small leather shoes. **Background**, soft bokeh:
+> a cream linen curtain catching afternoon light."
+
+Three depth planes + one element per plane = readable composition every time.
+
+**Trap.** Don't exceed three depth planes — NB2 collapses 4+ into a mush.
+
+#### R9 — Negative Space as Content
+NB2 reads "empty" as "blank canvas" and fills it. To *keep* empty space, **describe what fills it**:
+> "**70% of the frame is empty soft cream wall** with subtle warm light gradient from top-left
+> to bottom-right. Product placed only in the **bottom-right corner**."
+
+The empty space gets a positive description ("soft cream wall with gradient") — that's what
+makes NB2 keep it empty.
+
+#### R10 — Series Variant Generator
+For "5 hero shots of one product, all different angles / moments". Reuse the same **STYLE ANCHOR**
+(see §13.2) and vary ONLY the recipe used per variant:
+1. Variant 1: R6 (macro detail) — focus on a specific element
+2. Variant 2: R7 (environmental) — product passively in a scene
+3. Variant 3: R8 (spatial storyboard) — composed editorial
+4. Variant 4: R5 (cutout typography) — collection cover
+5. Variant 5: R3 (director's reference) — hero shot in named tradition
+
+Series cohesion comes from the shared anchor, variety comes from the recipe rotation.
+
+#### R11 — Conversational Refinement (Pro only)
+When using `gemini-3-pro-image-preview` for edits, NB2 supports multi-turn editing. Pattern:
+> Initial generation → "The shape is perfect, but **the fabric reads too plastic**. Keep
+> everything identical, only change the fabric to look like **brushed organic cotton with
+> visible weave**."
+
+Reference what's *already correct* explicitly — anchors what to preserve.
+
+**Trap.** Don't issue 3+ edits in one prompt — NB2 forgets the last ones. One edit per turn.
+
+#### R12 — Light Direction Lock
+NB2's default light is "soft diffused front-and-above". To break it, **name the source and
+direction**:
+| Phrase | Look |
+|---|---|
+| `single low side-light at 30° from camera left, raking across the fabric` | Texture-revealing, fashion editorial |
+| `window light from camera right at 45°, sheer linen curtain diffusing` | Calm domestic, brand-default Noukies |
+| `late golden hour backlight through a dusty window, particles visible in beams` | Cinematic warmth, narrative depth |
+| `top-down strobe on white seamless, no fill` | High-key catalogue, surgical |
+| `single candle 30cm from subject, no other light source` | Intimate, dramatic, heritage |
+
+**Trap.** "Dramatic lighting" alone is too vague. Always name source + direction + diffuser.
+
+#### R13 — Anti-Skeuomorphic Surface
+For "modern editorial" looks, prevent NB2 from making the product look like a 3D render:
+> "**Matte real-world surface**, **micro-imperfections** visible (slight lint, faint wrinkles,
+> natural fibre variation), **NOT a 3D product render**, **NOT studio-perfect**, photographed
+> as a real physical object."
+
+This is the trick to get "editorial real" vs "e-commerce sterile".
+
+#### R14 — House Style Phrase
+Once a brand-consistent phrase produces results you like, **reuse it verbatim** across the
+whole series. NB2 develops style memory through repetition. Our house phrase:
+> *"Editorial baby brand photography, soft diffused golden window light, palette of cream
+> #F5F0E8 and sage #B5C9A8, Kodak Portra 400 colour science, the calm tenderness of a
+> Bonpoint Paris atelier."*
+
+Use this verbatim in every Noukies lifestyle prompt — it's the brand's gravitational anchor.
+
+#### R15 — Color Palette Forcing
+NB2 drifts toward saturated/balanced palettes by default. To lock a palette, **name 3 specific
+hexes + their roles**:
+> "Strict palette: **dominant cream #F5F0E8** (60% of frame — walls, fabric), **accent sage
+> #B5C9A8** (25% — props), **secondary warm wood tone** (15% — furniture). **No other colours**
+> in the frame except subtle skin tone if a person is present."
+
+The percentage assignment is what makes the palette stick.
+
+**Trap.** "Pastel palette" produces NB2's default pastel. Force specific hexes + percentages.
+
+### 13.4 Creative-intent triggers
+
+Phrases like these in a user's input signal **creative latitude** — when the reformulator sees
+them, it should pick recipes from §13.3 rather than just clean up the wording:
+
+- "fais quelque chose d'original" / "sois créatif"
+- "pour la collection [thème]" / "thème [X]"
+- "inspiré de [...]"
+- "trouve une manière de présenter ..."
+- "donne-moi des idées"
+- "je veux un visuel qui sort de l'ordinaire"
+- "campagne" / "éditorial" / "magazine"
+
+When none of these signals are present, the reformulator should **stay technical and conservative**
+— don't impose creativity on a user who just wanted "le pantalon en bleu marine".
+
+### 13.5 Failure modes specific to NB2
+
+These are the ways NB2 fails creatively that don't appear in §10 (which covers general failures).
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| Output is technically correct but boring | No recipe applied — just §3 anatomy | Apply R1, R3, or R6 to break the default |
+| Theme keyword present but invisible in output | Theme dropped near end of long prompt | Move theme to first sentence + add STYLE ANCHOR (§13.2) |
+| Variants look identical despite different prompts | Shared phrasing too dominant | Vary recipe per variant (R10) |
+| Centered subject despite "off-center" instruction | Single-word direction too weak | Use R2 — thirds + negative-space description |
+| "Cinematic" produces generic Hollywood look | No specific tradition named | Replace with R3 (named director/era reference) |
+| Series drifts after 2 variants | No reusable anchor | Lock with §13.2 STYLE ANCHOR sentence |
+| Empty space gets filled with random props | "Negative space" interpreted as "to fill" | Apply R9 — positively describe the emptiness |
+| Texture flat / plasticky | Generic material noun | Apply R4 — full textile recipe |
+| Theme reads as cliché (cowboy = hat + boots) | NB2 defaults to symbol-stacking | Anchor in light/palette/material (§13.2), not object inventory |
+

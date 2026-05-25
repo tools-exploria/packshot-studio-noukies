@@ -11,7 +11,8 @@ import { ImageGrid } from "@/components/ImageGrid";
 import { GalleryLightbox, SimpleLightbox } from "@/components/Lightbox";
 import { useGenerationPage } from "@/hooks/useGenerationPage";
 import { PROMPTS } from "@/lib/prompts";
-import { IMAGE_ROLES, buildLegacyPayload } from "@/lib/interleaved";
+import { IMAGE_ROLES, buildInterleavedParts } from "@/lib/interleaved";
+import { ReformulableInput } from "@/components/Reformulable";
 
 const STEPS = ["Images", "Generation", "Export"];
 
@@ -22,15 +23,15 @@ const BASE_ROLE_OPTIONS = [
     { value: "product",   label: "Packshot existant" },
 ];
 
-// Roles for optional reference images (enrich the generation)
-const REF_ROLE_OPTIONS = [
-    { value: "existingProduct", label: "Produit existant" },
+// Reference types — UI-only hint that pre-fills the description placeholder.
+// All complementary references use the same IMAGE_ROLES.existingProduct under the hood;
+// the chips just help the client know what kind of info is useful to write.
+const REF_TYPES = [
+    { value: "detail",   label: "Detail a preserver",  hint: "Ex: l'etiquette CE en gros plan, l'anneau bleu plastique exact, le hochet transparent..." },
+    { value: "angle",    label: "Angle non visible",   hint: "Ex: tete du raton laveur vue de face, taupe et creme. Visage du doudou de face si cache sur la base." },
+    { value: "material", label: "Texture / Matiere",   hint: "Ex: le velours cotele creme du dos, la mousseline bleue exacte, le coton bio jersey..." },
 ];
-
-// Placeholders by reference role
-const REF_PLACEHOLDERS = {
-    existingProduct: "Que reprendre de ce produit ? Ex: la matiere velours vert, le zip dore...",
-};
+const DEFAULT_REF_HINT = "Decrivez precisement ce que le modele doit reprendre de cette image.";
 
 // ── Reusable card for a base image (with role selector) ─────
 function BaseImageCard({ input, index, onUpdateRole, onUpdateDesc, onRemove }) {
@@ -60,12 +61,13 @@ function BaseImageCard({ input, index, onUpdateRole, onUpdateDesc, onRemove }) {
                         Supprimer
                     </button>
                 </div>
-                <input
-                    type="text"
+                <ReformulableInput
                     value={input.description}
-                    onChange={(e) => onUpdateDesc(e.target.value)}
+                    onChange={onUpdateDesc}
                     placeholder="Decrivez cette image pour aider le modele..."
-                    className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    context={{ agent: "creation-sketch", role: "description", extras: { field: "base", baseRole: input.role, index } }}
+                    image={input.preview?.split(",")[1]}
+                    disableReformulate
                 />
                 <p className="text-[10px] text-muted-foreground leading-tight">
                     {role?.extract && <>Extraira : {role.extract}</>}
@@ -76,8 +78,9 @@ function BaseImageCard({ input, index, onUpdateRole, onUpdateDesc, onRemove }) {
     );
 }
 
-// ── Reusable card for a reference (product existant or fabric swatch) ─
-function RefProductCard({ input, index, onUpdateRole, onUpdateDesc, onRemove }) {
+// ── Reusable card for a complementary reference ─────────────
+function RefProductCard({ input, index, onUpdateType, onUpdateDesc, onRemove }) {
+    const placeholder = REF_TYPES.find((t) => t.value === input.refType)?.hint || DEFAULT_REF_HINT;
     return (
         <div className="flex gap-3 items-start p-3 rounded-lg border bg-muted/30">
             <div className="flex-shrink-0 relative">
@@ -88,27 +91,38 @@ function RefProductCard({ input, index, onUpdateRole, onUpdateDesc, onRemove }) 
                 </span>
             </div>
             <div className="flex-1 space-y-2 min-w-0">
-                <div className="flex items-center gap-2">
-                    <select
-                        value={input.role}
-                        onChange={(e) => onUpdateRole(e.target.value)}
-                        className="rounded-md border border-input bg-background px-2 py-1.5 text-sm font-medium"
-                    >
-                        {REF_ROLE_OPTIONS.map((opt) => (
-                            <option key={opt.value} value={opt.value}>{opt.label}</option>
-                        ))}
-                    </select>
+                <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-muted text-muted-foreground border">
+                        Reference complementaire
+                    </span>
                     <button onClick={onRemove}
                         className="text-destructive hover:text-destructive/80 text-xs font-medium ml-auto">
                         Supprimer
                     </button>
                 </div>
-                <input
-                    type="text"
+                <div className="flex gap-1.5 flex-wrap">
+                    {REF_TYPES.map((t) => (
+                        <button
+                            key={t.value}
+                            type="button"
+                            onClick={() => onUpdateType(t.value)}
+                            className={`text-[11px] px-2 py-0.5 rounded-md border transition-colors ${
+                                input.refType === t.value
+                                    ? "bg-primary text-primary-foreground border-primary"
+                                    : "bg-background text-muted-foreground border-input hover:bg-accent"
+                            }`}
+                        >
+                            {t.label}
+                        </button>
+                    ))}
+                </div>
+                <ReformulableInput
                     value={input.description}
-                    onChange={(e) => onUpdateDesc(e.target.value)}
-                    placeholder={REF_PLACEHOLDERS[input.role] || "Decrivez cette image..."}
-                    className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    onChange={onUpdateDesc}
+                    placeholder={placeholder}
+                    context={{ agent: "creation-sketch", role: "description", extras: { field: "ref", refType: input.refType, index } }}
+                    image={input.preview?.split(",")[1]}
+                    disableReformulate
                 />
             </div>
         </div>
@@ -132,7 +146,7 @@ export default function SketchTab() {
         editPrompt, setEditPrompt,
         editLoading,
         filledCount,
-        runGenerate,
+        runGenerateParts,
         handleEditImage,
         toggleSelect,
         toggleSelectAll,
@@ -150,7 +164,15 @@ export default function SketchTab() {
         reader.onload = (e) => {
             setList((prev) => [
                 ...prev,
-                { file: f, preview: e.target.result, role: defaultRole, description: "" },
+                {
+                    file: f,
+                    preview: e.target.result,
+                    role: defaultRole,
+                    description: "",
+                    // refType is UI-only state to drive the description placeholder for refs.
+                    // Defaults to "detail" so one chip appears active when a ref is added.
+                    ...(defaultRole === "existingProduct" ? { refType: "detail" } : {}),
+                },
             ]);
         };
         reader.readAsDataURL(f);
@@ -185,10 +207,9 @@ export default function SketchTab() {
             }));
 
             const instruction = PROMPTS.sketchToPackshot(productNotes.trim());
-            const legacy = buildLegacyPayload(inputs, instruction);
+            const parts = buildInterleavedParts(inputs, instruction);
 
-            const files = allInputs.map((inp) => inp.file);
-            await runGenerate(legacy.prompt, files, model);
+            await runGenerateParts(parts, model);
         } catch (err) {
             setError(err.message);
         }
@@ -214,7 +235,7 @@ export default function SketchTab() {
                     <p><span className="font-semibold text-foreground">1. Ajoutez au moins une base</span> — un croquis, une photo smartphone ou un packshot. Plus vous en ajoutez, mieux le modele comprendra le produit.</p>
                     <p><span className="font-semibold text-foreground">2. Choisissez le bon role</span> pour chaque image : un croquis sera interprete comme un guide de forme, une photo smartphone comme reference d'identite visuelle (couleurs, matieres).</p>
                     <p><span className="font-semibold text-foreground">3. Decrivez chaque image</span> — meme une phrase courte aide enormement. Ex : "Croquis vue de face d'une gigoteuse avec manches longues" ou "Photo de la gigoteuse grise prise sur un canape".</p>
-                    <p><span className="font-semibold text-foreground">4. Produits de reference</span> — si vous voulez reprendre la matiere, la couleur ou les finitions d'un produit existant, ajoutez son packshot en section 2 et precisez ce que vous voulez en tirer. Ex : "Reprendre le velours vert sauge et le zip dore". Pour appliquer une matiere brute (swatch textile), utilisez plutot l'onglet <strong>"3D Produit"</strong>.</p>
+                    <p><span className="font-semibold text-foreground">4. References complementaires</span> — la photo de base reste la source de verite. Ajoutez ici des refs pour : un angle non visible (ex : la tete d'une peluche cachee), un detail a reproduire precisement (etiquette CE, hardware) ou une matiere a reprendre d'un autre produit. Si vous voulez qu'une ref apparaisse dans le packshot final (ex : tete visible de face), precisez-le dans les notes a l'etape generation. Pour appliquer une matiere brute (swatch textile), utilisez plutot l'onglet <strong>"3D Produit"</strong>.</p>
                     <p><span className="font-semibold text-foreground">5. Utilisez les notes</span> a l'etape generation pour preciser des details que les images ne montrent pas (ex : "le zip est dore", "doublure interieure blanche").</p>
                 </div>
             </details>
@@ -265,17 +286,20 @@ export default function SketchTab() {
                         </CardContent>
                     </Card>
 
-                    {/* ── Existing product references (optional) ──── */}
+                    {/* ── Complementary references (optional) ─────── */}
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">
                                 <span className="w-6 h-6 rounded-full bg-muted text-muted-foreground text-xs flex items-center justify-center font-bold">2</span>
-                                Produits existants de reference
+                                References complementaires
                                 <span className="text-xs font-normal text-muted-foreground ml-1">optionnel</span>
                             </CardTitle>
                             <p className="text-sm text-muted-foreground">
-                                Packshot d'un produit existant dont le modele doit s'inspirer.
-                                Decrivez ce que vous voulez reprendre : matiere, couleur, finitions, zip...
+                                La base ci-dessus reste la source de verite. Ajoutez ici des references
+                                pour preciser un element non visible sur la base (ex : tete d'une peluche
+                                cachee), un detail a reproduire precisement (etiquette CE, hardware) ou
+                                une matiere a reprendre d'un autre produit. Decrivez clairement ce que
+                                le modele doit en tirer.
                             </p>
                         </CardHeader>
                         <CardContent className="space-y-4">
@@ -286,7 +310,7 @@ export default function SketchTab() {
                                             key={i}
                                             input={inp}
                                             index={i}
-                                            onUpdateRole={(v) => updateField(setRefInputs, i, "role", v)}
+                                            onUpdateType={(v) => updateField(setRefInputs, i, "refType", v)}
                                             onUpdateDesc={(v) => updateField(setRefInputs, i, "description", v)}
                                             onRemove={() => removeFrom(setRefInputs, i)}
                                         />
@@ -295,8 +319,8 @@ export default function SketchTab() {
                             )}
                             <UploadZone
                                 onFile={(f) => addImage(f, refInputs, setRefInputs, "existingProduct")}
-                                label={refInputs.length === 0 ? "Ajouter un produit de reference" : "Ajouter un autre produit"}
-                                sublabel="Packshot d'un produit existant du catalogue"
+                                label={refInputs.length === 0 ? "Ajouter une reference complementaire" : "Ajouter une autre reference"}
+                                sublabel="Detail, angle non visible, ou matiere a reprendre"
                                 className="py-4"
                             />
                         </CardContent>
@@ -368,6 +392,9 @@ export default function SketchTab() {
                                 notesPlaceholder="Notes sur le produit (ex: le zip est dore, le tissu est du velours cotele...)"
                                 generateLabel="sketch → packshot"
                                 onGenerate={handleGenerate}
+                                agent="creation-sketch"
+                                contextImage={baseInputs[0]?.preview?.split(",")[1]}
+                                contextExtras={{ baseCount: baseInputs.length, refCount: refInputs.length }}
                             />
                         )}
 
@@ -382,6 +409,7 @@ export default function SketchTab() {
                             onDownload={(i) => downloadImage(generatedImages[i], pipeline.getFileName(i))}
                             onGenerate={handleGenerate}
                             onExport={() => setStep(2)}
+                            agent="creation-sketch"
                         />
 
                         {!loading && !generatedImages.length && (

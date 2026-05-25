@@ -10,6 +10,7 @@ import { GenerationControls } from "@/components/GenerationControls";
 import { ImageGrid } from "@/components/ImageGrid";
 import { GalleryLightbox, SimpleLightbox } from "@/components/Lightbox";
 import { useGenerationPage } from "@/hooks/useGenerationPage";
+import { ReformulableTextarea } from "@/components/Reformulable";
 
 const STEPS = ["Setup", "Generation", "Export"];
 
@@ -146,12 +147,14 @@ export default function LaboPage() {
                             </p>
                         </CardHeader>
                         <CardContent>
-                            <textarea
+                            <ReformulableTextarea
                                 value={prompt}
-                                onChange={(e) => setPrompt(e.target.value)}
+                                onChange={setPrompt}
                                 placeholder="Ecrivez votre prompt ici... Il sera envoye tel quel au modele avec les images ci-dessus."
                                 rows={8}
-                                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-y"
+                                className="min-h-[180px]"
+                                context={{ agent: "labo", role: "freePrompt" }}
+                                image={productPreview?.split(",")[1]}
                             />
                         </CardContent>
                     </Card>
@@ -202,6 +205,8 @@ export default function LaboPage() {
                                 notesPlaceholder="Notes supplementaires (optionnel)"
                                 generateLabel="labo"
                                 onGenerate={handleGenerate}
+                                agent="labo"
+                                contextImage={productPreview?.split(",")[1]}
                             />
                         )}
 
@@ -216,6 +221,7 @@ export default function LaboPage() {
                             onDownload={(i) => downloadImage(generatedImages[i], pipeline.getFileName(i))}
                             onGenerate={handleGenerate}
                             onExport={() => setStep(2)}
+                            agent="labo"
                         />
 
                         {!loading && !generatedImages.length && (

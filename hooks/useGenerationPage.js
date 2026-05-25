@@ -153,6 +153,59 @@ export function useGenerationPage({
     }, [variantCount, resolution, aspectRatio]);
 
     /**
+     * Interleaved variant of runGenerate for multi-image tools.
+     * Caller has already encoded base64 and built the parts array via
+     * buildInterleavedParts(). Each image arrives at the model preceded
+     * by its role label — recommended for 3+ images with diverse roles.
+     *
+     * @param {Array<{type: string, text?: string, data?: string}>} parts - Interleaved content parts
+     * @param {string} [model]     - MODELS.FLASH | MODELS.PRO
+     * @param {number} [timeoutMs] - Override request timeout
+     */
+    const runGenerateParts = useCallback(async (parts, model = MODELS.FLASH, timeoutMs) => {
+        if (!parts || !parts.length) return;
+        setLoading(true);
+        setError(null);
+        setGeneratedImages(Array(variantCount).fill(null));
+        setSelectedImages(new Set());
+        setImageDims(Array(variantCount).fill(null));
+        try {
+            const extraOpts = timeoutMs ? { timeoutMs } : {};
+            const results = await generateImages({
+                parts,
+                count: variantCount,
+                model,
+                resolution,
+                aspectRatio,
+                ...extraOpts,
+                onProgress: (i, image) => {
+                    setGeneratedImages((prev) => {
+                        const next = [...prev];
+                        next[i] = image;
+                        return next;
+                    });
+                    const img = new Image();
+                    img.onload = () => {
+                        setImageDims((prev) => {
+                            const next = [...prev];
+                            next[i] = { w: img.naturalWidth, h: img.naturalHeight };
+                            return next;
+                        });
+                    };
+                    img.src = `data:image/png;base64,${image}`;
+                },
+            });
+
+            if (!results.length) setError("Aucune image générée");
+            setGeneratedImages(results.length ? results : []);
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    }, [variantCount, resolution, aspectRatio]);
+
+    /**
      * Edit a specific generated image variant using a text instruction.
      * Appends the new image at the end of the list (non-destructive).
      *
@@ -250,6 +303,7 @@ export function useGenerationPage({
         // Handlers
         handleProductFile,
         runGenerate,
+        runGenerateParts,
         handleEditImage,
         toggleSelect,
         toggleSelectAll,

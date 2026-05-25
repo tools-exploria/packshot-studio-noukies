@@ -12,6 +12,7 @@ import { GenerationControls } from "@/components/GenerationControls";
 import { ImageGrid } from "@/components/ImageGrid";
 import { GalleryLightbox, SimpleLightbox } from "@/components/Lightbox";
 import { useGenerationPage } from "@/hooks/useGenerationPage";
+import { ReformulableInput } from "@/components/Reformulable";
 
 const STEPS = ["Produit", "Broderie", "Placement", "Génération", "Export"];
 
@@ -159,12 +160,12 @@ export default function BroderiePage() {
                         {placement === "custom" && (
                             <div className="space-y-2">
                                 <Label>Emplacement personnalisé</Label>
-                                <input
-                                    type="text"
+                                <ReformulableInput
                                     value={customPlacement}
-                                    onChange={(e) => setCustomPlacement(e.target.value)}
+                                    onChange={setCustomPlacement}
                                     placeholder="Ex: sur l'épaule droite, au centre du bavoir, sous le col..."
-                                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                    context={{ agent: "broderie", role: "placement" }}
+                                    image={productPreview?.split(",")[1]}
                                 />
                             </div>
                         )}
@@ -219,6 +220,9 @@ export default function BroderiePage() {
                                 notesPlaceholder="Ex: La broderie doit être en fil doré. Le tissu est du velours, la broderie doit s'enfoncer légèrement."
                                 generateLabel="broderie"
                                 onGenerate={handleGenerate}
+                                agent="broderie"
+                                contextImage={productPreview?.split(",")[1]}
+                                contextExtras={{ placement: placement === "custom" ? customPlacement : placement }}
                             />
                         )}
 
@@ -233,6 +237,7 @@ export default function BroderiePage() {
                             onDownload={(i) => downloadImage(generatedImages[i], pipeline.getFileName(i))}
                             onGenerate={handleGenerate}
                             onExport={() => setStep(4)}
+                            agent="broderie"
                         />
                     </CardContent>
                 </Card>

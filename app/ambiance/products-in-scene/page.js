@@ -1,13 +1,7 @@
 "use client";
 import { useState, useCallback } from "react";
-
-// Feature flag — masque les nouveaux agents (scene-builder + products-in-scene)
-// tant qu'ils ne sont pas validés. Active : NEXT_PUBLIC_ENABLE_PREVIEW_AGENTS=true
-const PREVIEW_AGENTS_ENABLED = process.env.NEXT_PUBLIC_ENABLE_PREVIEW_AGENTS === "true";
-
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
 import { Stepper, UploadZone } from "@/components/shared";
 import { fileToBase64, downloadImage, MODELS } from "@/lib/api";
 import { useExportPipeline } from "@/hooks/useExportPipeline";
@@ -20,18 +14,18 @@ import { PROMPTS } from "@/lib/prompts";
 import { IMAGE_ROLES, buildInterleavedParts } from "@/lib/interleaved";
 import { ReformulableInput } from "@/components/Reformulable";
 
-const STEPS = ["Produits", "Génération", "Export"];
+const STEPS = ["Scène + Produits", "Génération", "Export"];
 
 const PRODUCT_PLACEHOLDERS = [
-    "Ex: Mobile musical avec oursons et étoiles, à suspendre au-dessus du berceau",
-    "Ex: Pyjama velours bleu ciel, à plier sur l'étagère ou draper sur la chaise",
-    "Ex: Gigoteuse en jersey gris avec broderie lapin, à poser dans le berceau",
-    "Ex: Peluche ours brun en velours, à placer assis sur l'étagère à côté des livres",
-    "Ex: Doudou lapin blanc en coton, à poser sur le lit ou dans le berceau",
-    "Ex: Coussin nuage en lin beige, à disposer sur le fauteuil ou dans le lit",
+    "Ex: Gigoteuse en jersey gris avec broderie lapin, à poser dans le berceau ou sur le lit",
+    "Ex: Doudou lapin blanc en coton, à placer sur le lit ou dans les bras d'un fauteuil",
+    "Ex: Mobile musical avec oursons et étoiles, à suspendre ou à poser sur l'étagère",
+    "Ex: Pyjama velours bleu ciel, à plier sur la commode ou draper sur la chaise",
+    "Ex: Peluche ours brun en velours, assise sur une étagère ou au pied du lit",
+    "Ex: Coussin nuage en lin beige, sur le fauteuil ou intégré à la literie",
 ];
 
-export default function RoomScenePage() {
+export default function ProductsInScenePage() {
     const [step, setStep] = useState(0);
 
     const {
@@ -52,13 +46,26 @@ export default function RoomScenePage() {
         handleEditImage,
         toggleSelect,
         toggleSelectAll,
-    } = useGenerationPage();
+    } = useGenerationPage({ defaultAspectRatio: "16:9" });
 
-    // ── Mood (optional) ──────────────────────────────────────
-    const [sceneMood, setSceneMood] = useState("");
+    // ── Scene reference (1, required) ─────────────────────────
+    const [sceneInput, setSceneInput] = useState(null);
 
-    // ── Products to place in the room (1+, required) ─────────
+    // ── Products to place (1+, required) ──────────────────────
     const [productInputs, setProductInputs] = useState([]);
+
+    const handleSceneUpload = useCallback((f) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            setSceneInput({
+                file: f,
+                preview: e.target.result,
+                role: "scene",
+                description: "",
+            });
+        };
+        reader.readAsDataURL(f);
+    }, []);
 
     const handleProductUpload = useCallback((f) => {
         const reader = new FileReader();
@@ -69,6 +76,10 @@ export default function RoomScenePage() {
             ]);
         };
         reader.readAsDataURL(f);
+    }, []);
+
+    const updateSceneDesc = useCallback((description) => {
+        setSceneInput((prev) => (prev ? { ...prev, description } : prev));
     }, []);
 
     const updateProductDesc = useCallback((idx, description) => {
@@ -85,20 +96,20 @@ export default function RoomScenePage() {
         setError,
     });
 
-    // ── Generation handler ────────────────────────────────────
     const handleGenerate = async (model = MODELS.FLASH) => {
-        if (!productInputs.length) return;
+        if (!sceneInput || !productInputs.length) return;
 
         try {
-            const base64Data = await Promise.all(productInputs.map((inp) => fileToBase64(inp.file)));
+            const allInputs = [sceneInput, ...productInputs];
+            const base64Data = await Promise.all(allInputs.map((inp) => fileToBase64(inp.file)));
 
-            const inputs = productInputs.map((inp, i) => ({
+            const inputs = allInputs.map((inp, i) => ({
                 role: inp.role,
                 data: base64Data[i],
                 description: inp.description || undefined,
             }));
 
-            const instruction = PROMPTS.roomScene(productInputs.length, sceneMood.trim() || "", productNotes.trim());
+            const instruction = PROMPTS.productsInScene(productInputs.length, productNotes.trim());
             const parts = buildInterleavedParts(inputs, instruction);
 
             await runGenerateParts(parts, model);
@@ -107,46 +118,37 @@ export default function RoomScenePage() {
         }
     };
 
-    // ── Can proceed? ──────────────────────────────────────────
-    const canGenerate = productInputs.length > 0;
-
-    // ── Previews for reference strip ──────────────────────────
-    const allPreviews = productInputs.map((inp, i) => ({
-        preview: inp.preview,
-        label: inp.description || `Produit ${i + 1}`,
-    }));
+    const canGenerate = sceneInput && productInputs.length > 0;
+    const allInputs = [sceneInput, ...productInputs].filter(Boolean);
 
     return (
         <div className="max-w-4xl mx-auto px-6 py-8">
-            {/* Ambiance tabs */}
+            {/* Sub-nav */}
             <div className="flex items-center gap-3 mb-6 flex-wrap">
-                <a href="/ambiance"
-                    className="px-3 py-1.5 text-sm font-medium rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors">
-                    Scène produit
-                </a>
-                <a href="/ambiance/room-scene"
-                    className="px-3 py-1.5 text-sm font-semibold rounded-lg bg-primary/10 text-primary">
-                    Scène chambre
-                </a>
-                {PREVIEW_AGENTS_ENABLED && (
-                    <>
-                        <a href="/ambiance/scene-builder"
-                            className="px-3 py-1.5 text-sm font-medium rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors">
-                            Créer une scène
-                        </a>
-                        <a href="/ambiance/products-in-scene"
-                            className="px-3 py-1.5 text-sm font-medium rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors">
-                            Produits dans scène
-                        </a>
-                    </>
-                )}
+                <a href="/ambiance" className="px-3 py-1.5 text-sm font-medium rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors">Scène produit</a>
+                <a href="/ambiance/room-scene" className="px-3 py-1.5 text-sm font-medium rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors">Scène chambre</a>
+                <a href="/ambiance/scene-builder" className="px-3 py-1.5 text-sm font-medium rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors">Créer une scène</a>
+                <a href="/ambiance/products-in-scene" className="px-3 py-1.5 text-sm font-semibold rounded-lg bg-primary/10 text-primary">Produits dans scène</a>
             </div>
 
             <div className="mb-6">
-                <h1 className="text-2xl font-bold">Scène chambre multi-produits</h1>
+                <h1 className="text-2xl font-bold">Produits dans une scène</h1>
                 <p className="text-sm text-muted-foreground mt-1">
-                    Placez plusieurs produits Noukies dans une chambre bébé stylée pour générer une photo d'ambiance grand angle.
+                    Intégrez plusieurs produits Noukies dans une scène fournie. La scène sert d'inspiration
+                    (mood, lumière, palette) — le modèle a la latitude d'adapter cadrage et composition
+                    pour bien présenter les produits.
                 </p>
+                <details className="mt-3 text-sm">
+                    <summary className="cursor-pointer font-medium text-muted-foreground hover:text-foreground">
+                        Comment bien utiliser cet outil ?
+                    </summary>
+                    <div className="mt-2 p-4 rounded-lg bg-muted/50 border space-y-2 text-muted-foreground text-[13px] leading-relaxed">
+                        <p><span className="font-semibold text-foreground">1. Uploadez une scène</span> — soit générée via <em>Créer une scène</em>, soit une vraie photo, soit un Pinterest. Elle définit l'atmosphère.</p>
+                        <p><span className="font-semibold text-foreground">2. Ajoutez vos produits</span> — packshots détourés. Le modèle préserve leur identité exacte (couleurs, motifs, matières).</p>
+                        <p><span className="font-semibold text-foreground">3. Décrivez chaque image</span> — ça aide le modèle à comprendre le contexte. Pour la scène, décrivez l'ambiance ; pour chaque produit, ce qu'il est.</p>
+                        <p><span className="font-semibold text-foreground">4. La scène n'est pas figée</span> — le modèle peut zoomer, recadrer, ajuster la lumière pour bien intégrer les produits. C'est voulu.</p>
+                    </div>
+                </details>
             </div>
 
             <Stepper steps={STEPS} currentStep={step} />
@@ -155,22 +157,60 @@ export default function RoomScenePage() {
                 <div className="bg-destructive/10 text-destructive rounded-lg p-4 mb-6 text-sm">{error}</div>
             )}
 
-            {/* ─── Step 0: Product Inputs ──────────────────────── */}
+            {/* Step 0: Inputs */}
             {step === 0 && (
                 <div className="space-y-6">
+                    {/* Scene reference */}
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">
                                 <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center font-bold">1</span>
-                                Produits à placer dans la chambre
+                                Scène de référence
+                                <span className="text-xs font-normal text-destructive ml-1">obligatoire</span>
+                            </CardTitle>
+                            <p className="text-sm text-muted-foreground">
+                                L'image qui inspire l'ambiance, la lumière et la palette du résultat final.
+                            </p>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            <UploadZone
+                                onFile={handleSceneUpload}
+                                label="Image de scène"
+                                sublabel="Scène générée, photo d'intérieur, mood board…"
+                                preview={sceneInput?.preview}
+                            />
+                            {sceneInput && (
+                                <div>
+                                    <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                                        Décrivez cette scène (optionnel mais utile)
+                                    </label>
+                                    <ReformulableInput
+                                        value={sceneInput.description}
+                                        onChange={updateSceneDesc}
+                                        placeholder="Ex: Chambre bébé lumineuse, palette crème et sage, lumière naturelle de fin d'après-midi"
+                                        context={{ agent: "ambiance-products-in-scene", role: "description", extras: { field: "scene" } }}
+                                        image={sceneInput.preview?.split(",")[1]}
+                                        disableReformulate
+                                    />
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    {/* Products */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center font-bold">2</span>
+                                Produits à intégrer
                                 <span className="text-xs font-normal text-destructive ml-1">min. 1 produit</span>
                             </CardTitle>
                             <p className="text-sm text-muted-foreground">
-                                Ajoutez les packshots des produits Noukies à mettre en scène.
-                                Tous les produits seront placés naturellement dans une chambre bébé.
+                                Packshots détourés des produits Noukies. Leur identité (couleur, matière, motif)
+                                sera préservée à 100 %.
                             </p>
                             <p className="text-xs text-amber-600 mt-1">
-                                Jusqu'à 6 produits pour une fidélité optimale. Au-delà de 6 (max 14), la qualité de reproduction peut diminuer.
+                                Jusqu'à 6 produits pour une fidélité optimale (max 14).
                             </p>
                         </CardHeader>
                         <CardContent className="space-y-4">
@@ -197,7 +237,7 @@ export default function RoomScenePage() {
                                                     value={inp.description}
                                                     onChange={(v) => updateProductDesc(i, v)}
                                                     placeholder={PRODUCT_PLACEHOLDERS[i % PRODUCT_PLACEHOLDERS.length]}
-                                                    context={{ agent: "ambiance-room-scene", role: "description", extras: { field: "product", index: i } }}
+                                                    context={{ agent: "ambiance-products-in-scene", role: "description", extras: { field: "product", index: i } }}
                                                     image={inp.preview?.split(",")[1]}
                                                     disableReformulate
                                                 />
@@ -209,26 +249,7 @@ export default function RoomScenePage() {
                             <UploadZone
                                 onFile={handleProductUpload}
                                 label={productInputs.length === 0 ? "Ajoutez votre premier produit" : "Ajouter un autre produit"}
-                                sublabel="Packshot détouré du produit (PNG ou JPG, fond blanc)"
-                            />
-                        </CardContent>
-                    </Card>
-
-                    {/* ── Optional mood ────────────────────────── */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <span className="w-6 h-6 rounded-full bg-muted text-muted-foreground text-xs flex items-center justify-center font-bold">2</span>
-                                Ambiance
-                                <span className="text-xs font-normal text-muted-foreground ml-1">optionnel</span>
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <ReformulableInput
-                                value={sceneMood}
-                                onChange={setSceneMood}
-                                placeholder="Ex: lumière dorée du matin, ambiance cocooning, tons chauds..."
-                                context={{ agent: "ambiance-room-scene", role: "mood" }}
+                                sublabel="Packshot détouré (PNG/JPG fond blanc de préférence)"
                             />
                         </CardContent>
                     </Card>
@@ -239,37 +260,37 @@ export default function RoomScenePage() {
                 </div>
             )}
 
-            {/* ─── Step 1: Generation ───────────────────────────── */}
+            {/* Step 1: Generation */}
             {step === 1 && (
                 <Card>
                     <CardHeader>
-                        <CardTitle>Génération — Scène chambre</CardTitle>
+                        <CardTitle>Génération</CardTitle>
                         <p className="text-sm text-muted-foreground">
-                            {productInputs.length} produit{productInputs.length > 1 ? "s" : ""} à placer dans la chambre.
+                            1 scène + {productInputs.length} produit{productInputs.length > 1 ? "s" : ""} à intégrer.
                         </p>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         {/* Reference strip */}
                         <div className="flex gap-3 p-3 rounded-lg bg-muted/50 border border-dashed overflow-x-auto">
-                            {allPreviews.map((ref, i) => (
+                            {allInputs.map((inp, i) => (
                                 <div key={i} className="flex-shrink-0 w-24 text-center cursor-pointer"
-                                    onClick={() => pipeline.setRefLightboxSrc(ref.preview)}>
-                                    <img src={ref.preview} alt={ref.label}
+                                    onClick={() => pipeline.setRefLightboxSrc(inp.preview)}>
+                                    <img src={inp.preview} alt={IMAGE_ROLES[inp.role]?.label}
                                         className="w-full aspect-square object-contain rounded-md bg-white hover:ring-2 hover:ring-primary transition-all" />
-                                    <p className="text-[10px] text-muted-foreground mt-1 leading-tight truncate" title={ref.label}>
-                                        {ref.label}
+                                    <p className="text-[10px] text-muted-foreground mt-1 leading-tight truncate">
+                                        {i === 0 ? "Scène" : `Produit ${i}`}
                                     </p>
                                 </div>
                             ))}
                         </div>
 
-                        {/* Show manifest */}
+                        {/* Manifest */}
                         <details className="text-sm">
                             <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
                                 Voir le manifeste d'images
                             </summary>
                             <div className="mt-2 p-3 rounded-lg bg-muted text-xs space-y-2">
-                                {productInputs.map((inp, i) => {
+                                {allInputs.map((inp, i) => {
                                     const role = IMAGE_ROLES[inp.role];
                                     return (
                                         <div key={i} className="flex gap-2">
@@ -278,7 +299,8 @@ export default function RoomScenePage() {
                                                 <span className="font-medium">{role?.label || inp.role}</span>
                                                 {inp.description && <span className="text-muted-foreground"> — {inp.description}</span>}
                                                 <br />
-                                                <span className="text-muted-foreground">Extraire: {role?.extract}</span>
+                                                <span className="text-muted-foreground">Extraire : {role?.extract}</span>
+                                                {role?.ignore && <><br /><span className="text-destructive/70">Ignorer : {role?.ignore}</span></>}
                                             </div>
                                         </div>
                                     );
@@ -293,12 +315,12 @@ export default function RoomScenePage() {
                                 aspectRatio={aspectRatio} setAspectRatio={setAspectRatio}
                                 activePreset={activePreset} applyPreset={applyPreset} clearPreset={clearPreset}
                                 productNotes={productNotes} setProductNotes={setProductNotes}
-                                notesPlaceholder="Notes (ex: la gigoteuse dans le lit, le doudou sur l'étagère...)"
-                                generateLabel="scène chambre"
+                                notesPlaceholder="Notes (ex: la gigoteuse dans le berceau, le doudou en premier plan, lumière plus douce…)"
+                                generateLabel="scène"
                                 onGenerate={handleGenerate}
-                                agent="ambiance-room-scene"
-                                contextImage={productInputs[0]?.preview?.split(",")[1]}
-                                contextExtras={{ productCount: productInputs.length, mood: sceneMood || undefined }}
+                                agent="ambiance-products-in-scene"
+                                contextImage={sceneInput?.preview?.split(",")[1]}
+                                contextExtras={{ productCount: productInputs.length }}
                             />
                         )}
 
@@ -313,7 +335,7 @@ export default function RoomScenePage() {
                             onDownload={(i) => downloadImage(generatedImages[i], pipeline.getFileName(i))}
                             onGenerate={handleGenerate}
                             onExport={() => setStep(2)}
-                            agent="ambiance-room-scene"
+                            agent="ambiance-products-in-scene"
                         />
 
                         {!loading && !generatedImages.length && (
@@ -323,7 +345,7 @@ export default function RoomScenePage() {
                 </Card>
             )}
 
-            {/* ─── Step 2: Export ────────────────────────────────── */}
+            {/* Step 2: Export */}
             {step === 2 && (
                 <Card>
                     <CardHeader>
@@ -340,7 +362,7 @@ export default function RoomScenePage() {
                                 <div key={idx} onClick={() => toggleSelect(idx)}
                                     className={`relative text-center cursor-pointer rounded-lg border-2 overflow-hidden transition-all hover:shadow-lg ${selectedImages.has(idx) ? "border-primary ring-2 ring-primary ring-offset-2" : "border-transparent"}`}>
                                     <img src={`data:image/png;base64,${img}`} alt={`Variante ${idx + 1}`}
-                                        className="w-full aspect-square object-contain bg-white" />
+                                        className="w-full aspect-video object-contain bg-white" />
                                     <div className={`absolute top-2 left-2 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shadow transition-all ${selectedImages.has(idx) ? "bg-primary text-primary-foreground" : "bg-white/80 text-muted-foreground"}`}>
                                         {selectedImages.has(idx) ? "✓" : idx + 1}
                                     </div>

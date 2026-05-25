@@ -2,6 +2,7 @@
 import { Button } from "@/components/ui/button";
 import { MODELS } from "@/lib/api";
 import { LoadingDots } from "@/components/shared";
+import { ReformulableInput } from "@/components/Reformulable";
 
 /**
  * Shared image grid with selection, download, inline edit, and regeneration.
@@ -32,6 +33,7 @@ export function ImageGrid({
     loading, setLightboxIdx,
     toggleSelect, toggleSelectAll,
     handleEditImage, onDownload, onGenerate, onExport,
+    agent = "edit-inline",
 }) {
     return (
         <>
@@ -70,12 +72,23 @@ export function ImageGrid({
                                         {editingIdx === i && (
                                             <div className="absolute left-0 right-0 bottom-10 p-2 bg-background border-t" onClick={(e) => e.stopPropagation()}>
                                                 <div className="flex gap-1">
-                                                    <input type="text" value={editPrompt}
-                                                        onChange={(e) => setEditPrompt(e.target.value)}
-                                                        onKeyDown={(e) => { if (e.key === "Enter" && editPrompt.trim()) handleEditImage(i); }}
-                                                        placeholder="Décrivez la modification…"
-                                                        className="flex-1 rounded-md border border-input bg-background px-2 py-1 text-xs"
-                                                        autoFocus />
+                                                    <div className="flex-1">
+                                                        <ReformulableInput
+                                                            value={editPrompt}
+                                                            onChange={setEditPrompt}
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === "Enter" && !e.shiftKey && editPrompt.trim()) {
+                                                                    e.preventDefault();
+                                                                    handleEditImage(i);
+                                                                }
+                                                            }}
+                                                            placeholder="Décrivez la modification…"
+                                                            className="text-xs"
+                                                            autoFocus
+                                                            context={{ agent, role: "editPrompt" }}
+                                                            image={img}
+                                                        />
+                                                    </div>
                                                     <Button size="sm" variant="outline" disabled={editLoading || !editPrompt.trim()}
                                                         onClick={() => handleEditImage(i, MODELS.FLASH)} className="text-xs h-7" title="Rapide (Flash)">
                                                         {editLoading ? <LoadingDots /> : "⚡"}

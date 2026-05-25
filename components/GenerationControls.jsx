@@ -2,6 +2,7 @@
 import { Button } from "@/components/ui/button";
 import { GENERATION_PRESETS } from "@/hooks/useGenerationPage";
 import { MODELS } from "@/lib/api";
+import { ReformulableTextarea } from "@/components/Reformulable";
 
 /**
  * Shared generation controls: presets, variant count, resolution, ratio, notes, generate button.
@@ -34,6 +35,9 @@ export function GenerationControls({
     generateLabel = "packshot",
     onGenerate,
     maxVariants = 10,
+    agent = "unknown",
+    contextImage,
+    contextExtras,
 }) {
     return (
         <div className="space-y-4">
@@ -79,11 +83,16 @@ export function GenerationControls({
             {setProductNotes && (
                 <div className="space-y-1">
                     <label className="text-sm font-medium">Notes produit (optionnel)</label>
-                    <textarea value={productNotes} onChange={(e) => setProductNotes(e.target.value)}
+                    <ReformulableTextarea
+                        value={productNotes}
+                        onChange={setProductNotes}
                         placeholder={notesPlaceholder}
-                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[60px] resize-y"
-                        rows={2} />
-                    <p className="text-[11px] text-muted-foreground">Ajoutez des précisions spécifiques au produit pour améliorer le résultat.</p>
+                        className="min-h-[60px]"
+                        rows={2}
+                        context={{ agent, role: "notes", extras: contextExtras }}
+                        image={contextImage}
+                    />
+                    <p className="text-[11px] text-muted-foreground">Ajoutez des précisions spécifiques au produit pour améliorer le résultat. ✨ pour reformuler.</p>
                 </div>
             )}
             <Button onClick={() => onGenerate(MODELS.FLASH)} className="w-full">

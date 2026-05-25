@@ -1,5 +1,10 @@
 "use client";
 import { useState } from "react";
+
+// Feature flag — masque les nouveaux agents (scene-builder + products-in-scene)
+// tant qu'ils ne sont pas validés. Active : NEXT_PUBLIC_ENABLE_PREVIEW_AGENTS=true
+const PREVIEW_AGENTS_ENABLED = process.env.NEXT_PUBLIC_ENABLE_PREVIEW_AGENTS === "true";
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -12,6 +17,7 @@ import { GenerationControls } from "@/components/GenerationControls";
 import { ImageGrid } from "@/components/ImageGrid";
 import { GalleryLightbox, SimpleLightbox } from "@/components/Lightbox";
 import { useGenerationPage } from "@/hooks/useGenerationPage";
+import { ReformulableTextarea, ReformulableInput } from "@/components/Reformulable";
 
 const STEPS = ["Produit", "Scène", "Génération", "Export"];
 
@@ -112,7 +118,7 @@ export default function AmbiancePage() {
     return (
         <div className="max-w-4xl mx-auto px-6 py-8">
             {/* Ambiance tabs */}
-            <div className="flex items-center gap-3 mb-6">
+            <div className="flex items-center gap-3 mb-6 flex-wrap">
                 <a href="/ambiance"
                     className="px-3 py-1.5 text-sm font-semibold rounded-lg bg-primary/10 text-primary">
                     Scène produit
@@ -121,6 +127,18 @@ export default function AmbiancePage() {
                     className="px-3 py-1.5 text-sm font-medium rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors">
                     Scène chambre
                 </a>
+                {PREVIEW_AGENTS_ENABLED && (
+                    <>
+                        <a href="/ambiance/scene-builder"
+                            className="px-3 py-1.5 text-sm font-medium rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors">
+                            Créer une scène
+                        </a>
+                        <a href="/ambiance/products-in-scene"
+                            className="px-3 py-1.5 text-sm font-medium rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors">
+                            Produits dans scène
+                        </a>
+                    </>
+                )}
             </div>
 
             <Stepper steps={STEPS} currentStep={step} />
@@ -181,9 +199,12 @@ export default function AmbiancePage() {
                                 </div>
                                 <div className="space-y-1">
                                     <Label className="text-xs">Ambiance (optionnel)</Label>
-                                    <input type="text" value={sceneMood} onChange={(e) => setSceneMood(e.target.value)}
+                                    <ReformulableInput
+                                        value={sceneMood} onChange={setSceneMood}
                                         placeholder="Ex: lumière dorée du matin, ambiance cocooning..."
-                                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+                                        context={{ agent: "ambiance", role: "mood", extras: { sceneType: "nursery_scene", placement: productPlacement } }}
+                                        image={productPreview?.split(",")[1]}
+                                    />
                                 </div>
                             </div>
                         )}
@@ -203,9 +224,12 @@ export default function AmbiancePage() {
                                 </div>
                                 <div className="space-y-1">
                                     <Label className="text-xs">Ambiance (optionnel)</Label>
-                                    <input type="text" value={sceneMood} onChange={(e) => setSceneMood(e.target.value)}
+                                    <ReformulableInput
+                                        value={sceneMood} onChange={setSceneMood}
                                         placeholder="Ex: tendre et paisible, moment de jeu..."
-                                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+                                        context={{ agent: "ambiance", role: "mood", extras: { sceneType: "baby_scene", babyAge } }}
+                                        image={productPreview?.split(",")[1]}
+                                    />
                                 </div>
                             </div>
                         )}
@@ -225,9 +249,12 @@ export default function AmbiancePage() {
                                 </div>
                                 <div className="space-y-1">
                                     <Label className="text-xs">Ambiance (optionnel)</Label>
-                                    <input type="text" value={sceneMood} onChange={(e) => setSceneMood(e.target.value)}
+                                    <ReformulableInput
+                                        value={sceneMood} onChange={setSceneMood}
                                         placeholder="Ex: lumière fraîche du matin, ambiance automnale..."
-                                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+                                        context={{ agent: "ambiance", role: "mood", extras: { sceneType: "outdoor_scene", outdoorType } }}
+                                        image={productPreview?.split(",")[1]}
+                                    />
                                 </div>
                             </div>
                         )}
@@ -241,11 +268,13 @@ export default function AmbiancePage() {
                         {sceneType === "custom" && (
                             <div className="space-y-2">
                                 <Label>Décrivez votre scène</Label>
-                                <textarea
+                                <ReformulableTextarea
                                     value={customPrompt}
-                                    onChange={(e) => setCustomPrompt(e.target.value)}
+                                    onChange={setCustomPrompt}
                                     placeholder="Un bébé assis sur un tapis dans un salon lumineux..."
-                                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[100px] resize-y"
+                                    className="min-h-[100px]"
+                                    context={{ agent: "ambiance-custom", role: "customPrompt" }}
+                                    image={productPreview?.split(",")[1]}
                                 />
                             </div>
                         )}
@@ -298,6 +327,9 @@ export default function AmbiancePage() {
                                 notesPlaceholder="Ex: Le produit doit être au premier plan, bien visible. L'ambiance doit être chaleureuse."
                                 generateLabel="photo"
                                 onGenerate={handleGenerate}
+                                agent="ambiance"
+                                contextImage={productPreview?.split(",")[1]}
+                                contextExtras={{ sceneType, babyAge: sceneType === "baby_scene" ? babyAge : undefined, outdoorType: sceneType === "outdoor_scene" ? outdoorType : undefined, placement: sceneType === "nursery_scene" ? productPlacement : undefined }}
                             />
                         )}
 
@@ -312,6 +344,7 @@ export default function AmbiancePage() {
                             onDownload={(i) => downloadImage(generatedImages[i], pipeline.getFileName(i))}
                             onGenerate={handleGenerate}
                             onExport={() => setStep(3)}
+                            agent="ambiance"
                         />
 
                         {!loading && !generatedImages.length && (

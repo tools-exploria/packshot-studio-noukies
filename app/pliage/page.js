@@ -11,7 +11,8 @@ import { ImageGrid } from "@/components/ImageGrid";
 import { GalleryLightbox, SimpleLightbox } from "@/components/Lightbox";
 import { useGenerationPage } from "@/hooks/useGenerationPage";
 import { PROMPTS } from "@/lib/prompts";
-import { IMAGE_ROLES, buildLegacyPayload } from "@/lib/interleaved";
+import { IMAGE_ROLES, buildInterleavedParts } from "@/lib/interleaved";
+import { ReformulableInput } from "@/components/Reformulable";
 
 const STEPS = ["Images", "Generation", "Export"];
 
@@ -32,7 +33,7 @@ export default function PliagePage() {
         editPrompt, setEditPrompt,
         editLoading,
         filledCount,
-        runGenerate,
+        runGenerateParts,
         handleEditImage,
         toggleSelect,
         toggleSelectAll,
@@ -101,10 +102,9 @@ export default function PliagePage() {
             }));
 
             const instruction = PROMPTS.pliage(garmentInputs.length, productNotes.trim());
-            const legacy = buildLegacyPayload(inputs, instruction);
+            const parts = buildInterleavedParts(inputs, instruction);
 
-            const files = allInputs.map((inp) => inp.file);
-            await runGenerate(legacy.prompt, files, model);
+            await runGenerateParts(parts, model);
         } catch (err) {
             setError(err.message);
         }
@@ -175,12 +175,13 @@ export default function PliagePage() {
                                     <label className="text-xs font-medium text-muted-foreground mb-1 block">
                                         Decrivez cette disposition
                                     </label>
-                                    <input
-                                        type="text"
+                                    <ReformulableInput
                                         value={arrangementInput.description}
-                                        onChange={(e) => updateArrangementDesc(e.target.value)}
+                                        onChange={updateArrangementDesc}
                                         placeholder={"Ex: Pyjama 2 pieces plie a plat, pantalon pose sur le cote droit du haut"}
-                                        className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                        context={{ agent: "pliage", role: "description", extras: { field: "arrangement" } }}
+                                        image={arrangementInput.preview?.split(",")[1]}
+                                        disableReformulate
                                     />
                                 </div>
                             )}
@@ -220,12 +221,13 @@ export default function PliagePage() {
                                                         Supprimer
                                                     </button>
                                                 </div>
-                                                <input
-                                                    type="text"
+                                                <ReformulableInput
                                                     value={inp.description}
-                                                    onChange={(e) => updateGarmentDesc(i, e.target.value)}
+                                                    onChange={(v) => updateGarmentDesc(i, v)}
                                                     placeholder={"Decrivez ce vetement (ex: Haut blanc a motifs dinosaures, coton jersey)"}
-                                                    className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                                                    context={{ agent: "pliage", role: "description", extras: { field: "garment", index: i } }}
+                                                    image={inp.preview?.split(",")[1]}
+                                                    disableReformulate
                                                 />
                                             </div>
                                         </div>
@@ -304,6 +306,9 @@ export default function PliagePage() {
                                 notesPlaceholder="Notes (ex: pantalon au premier plan, manches pliees vers l'interieur...)"
                                 generateLabel="pliage"
                                 onGenerate={handleGenerate}
+                                agent="pliage"
+                                contextImage={arrangementInput?.preview?.split(",")[1]}
+                                contextExtras={{ garmentCount: garmentInputs.length }}
                             />
                         )}
 
@@ -318,6 +323,7 @@ export default function PliagePage() {
                             onDownload={(i) => downloadImage(generatedImages[i], pipeline.getFileName(i))}
                             onGenerate={handleGenerate}
                             onExport={() => setStep(2)}
+                            agent="pliage"
                         />
 
                         {!loading && !generatedImages.length && (

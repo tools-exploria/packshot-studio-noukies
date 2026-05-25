@@ -229,6 +229,8 @@ export default function PatternPage() {
                                 notesPlaceholder="Ex: Le produit a des bretelles en tissu qui doivent aussi recevoir le motif. Les parties en plastique sont transparentes."
                                 generateLabel="packshot"
                                 onGenerate={handleGenerate}
+                                agent="pattern"
+                                contextImage={productPreview?.split(",")[1]}
                             />
                         )}
 
@@ -243,6 +245,7 @@ export default function PatternPage() {
                             onDownload={(i) => downloadImage(generatedImages[i], pipeline.getFileName(i))}
                             onGenerate={handleGenerate}
                             onExport={() => setStep(4)}
+                            agent="pattern"
                         />
                     </CardContent>
                 </Card>
