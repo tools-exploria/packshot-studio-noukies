@@ -65,7 +65,10 @@ export default function ProductsInScenePage() {
                 file: f,
                 preview: e.target.result,
                 role: "scene",
-                description: "",
+                // No `description` — the manifest already labels the image as
+                // SCENE / ENVIRONMENT REFERENCE with extract/ignore rules. Asking
+                // the user to describe the scene was redundant + confusing.
+                // Actionable scene changes go in sceneTweaks, not here.
             });
         };
         reader.readAsDataURL(f);
@@ -80,10 +83,6 @@ export default function ProductsInScenePage() {
             ]);
         };
         reader.readAsDataURL(f);
-    }, []);
-
-    const updateSceneDesc = useCallback((description) => {
-        setSceneInput((prev) => (prev ? { ...prev, description } : prev));
     }, []);
 
     const updateProductDesc = useCallback((idx, description) => {
@@ -188,39 +187,20 @@ export default function ProductsInScenePage() {
                                 preview={sceneInput?.preview}
                             />
                             {sceneInput && (
-                                <>
-                                    <div>
-                                        <label className="text-xs font-medium text-muted-foreground mb-1 block">
-                                            Décrivez cette scène (optionnel mais utile)
-                                        </label>
-                                        <ReformulableInput
-                                            value={sceneInput.description}
-                                            onChange={updateSceneDesc}
-                                            placeholder="Ex: Chambre bébé lumineuse, palette crème et sage, lumière naturelle de fin d'après-midi"
-                                            context={{ agent: "ambiance-products-in-scene", role: "description", extras: { field: "scene" } }}
-                                            image={sceneInput.preview?.split(",")[1]}
-                                            disableReformulate
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="text-xs font-medium text-muted-foreground mb-1 block">
-                                            Modifications de la scène (optionnel)
-                                        </label>
-                                        <ReformulableTextarea
-                                            value={sceneTweaks}
-                                            onChange={setSceneTweaks}
-                                            placeholder="Ex: mur plus chaud (terracotta clair), retirer le tableau au-dessus du lit, ajouter une lampe à gauche, lumière plus dorée…"
-                                            className="min-h-[80px]"
-                                            rows={3}
-                                            context={{ agent: "ambiance-products-in-scene", role: "sceneTweaks", extras: { productCount: productInputs.length } }}
-                                            image={sceneInput.preview?.split(",")[1]}
-                                        />
-                                        <p className="text-[11px] text-muted-foreground mt-1 leading-snug">
-                                            Évite les allers-retours vers <em>Créer une scène</em> : ajustez ici la scène
-                                            en même temps que vous y placez vos produits.
-                                        </p>
-                                    </div>
-                                </>
+                                <div>
+                                    <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                                        Modifications de la scène (optionnel)
+                                    </label>
+                                    <ReformulableTextarea
+                                        value={sceneTweaks}
+                                        onChange={setSceneTweaks}
+                                        placeholder="Ex: mur plus chaud (terracotta clair), retirer le tableau au-dessus du lit, ajouter une lampe à gauche, lumière plus dorée…"
+                                        className="min-h-[80px]"
+                                        rows={3}
+                                        context={{ agent: "ambiance-products-in-scene", role: "sceneTweaks", extras: { productCount: productInputs.length } }}
+                                        image={sceneInput.preview?.split(",")[1]}
+                                    />
+                                </div>
                             )}
                         </CardContent>
                     </Card>
