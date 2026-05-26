@@ -261,5 +261,7 @@ export function useExportPipeline({ generatedImages, imageDims, resolution, aspe
         generateGreenScreen, generateAllGreenScreens,
         getExportImages, getFileName, getExportIndices,
         handleExport, handleExportJPG, handleExportPDF,
+        // Exposed for ExportPanel to detect aspect-ratio mismatch warnings.
+        generationAspectRatio: aspectRatio,
     };
 }

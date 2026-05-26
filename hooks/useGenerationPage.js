@@ -21,11 +21,32 @@ import { fileToBase64, compressBase64Image, generateImages, MODELS } from "@/lib
  */
 export const GENERATION_PRESETS = {
     "noukies-packshot": {
-        label: "Noukies Packshot",
-        description: "Génère en 2K 4:5 (~1664x2048), à exporter en 1560x2000",
+        label: "Packshot 4:5",
+        description: "2K 4:5 → export 1560×2000",
         resolution: "2K",
         aspectRatio: "4:5",
         exportSize: "1560x2000",
+    },
+    "carre-2k": {
+        label: "Carré 2K",
+        description: "2K 1:1 → export 2048×2048",
+        resolution: "2K",
+        aspectRatio: "1:1",
+        exportSize: "2048x2048",
+    },
+    "banner-16-9": {
+        label: "Bannière 16:9",
+        description: "2K 16:9 → export 2048×1152",
+        resolution: "2K",
+        aspectRatio: "16:9",
+        exportSize: "2048x1152",
+    },
+    "story-9-16": {
+        label: "Story 9:16",
+        description: "2K 9:16 → export 1152×2048",
+        resolution: "2K",
+        aspectRatio: "9:16",
+        exportSize: "1152x2048",
     },
 };
 

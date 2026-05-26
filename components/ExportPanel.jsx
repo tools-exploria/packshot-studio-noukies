@@ -3,14 +3,29 @@ import { Button } from "@/components/ui/button";
 import { LoadingDots } from "@/components/shared";
 
 /**
+ * Available export sizes. Each carries its aspect ratio (w/h) so we can warn
+ * the user when they pick a size that doesn't match the generation ratio.
+ */
+const EXPORT_SIZES = [
+    { value: "", label: "Natif", ratio: null },
+    { value: "1024x1024", label: "1024×1024", ratio: 1 },
+    { value: "2048x2048", label: "2048×2048", ratio: 1 },
+    { value: "4096x4096", label: "4096×4096", ratio: 1 },
+    { value: "1560x2000", label: "1560×2000", ratio: 1560 / 2000 },
+    { value: "2048x1152", label: "2048×1152", ratio: 2048 / 1152 },
+    { value: "1152x2048", label: "1152×2048", ratio: 1152 / 2048 },
+];
+
+function parseGenRatio(r) {
+    if (!r) return null;
+    const [a, b] = r.split(":").map(Number);
+    return a && b ? a / b : null;
+}
+
+/**
  * Shared export panel UI: background mode, chroma key picker, resize, download buttons.
- *
- * @param {Object} props
- * @param {Object} props.pipeline - return value of useExportPipeline()
- * @param {string[]} props.generatedImages - base64 images
- * @param {boolean} props.loading
- * @param {number} props.filledCount - count of non-null generated images
- * @param {Set} props.selectedImages
+ * The generation aspect ratio is read from pipeline.generationAspectRatio so all 12
+ * consumer pages get the export mismatch warning for free without prop drilling.
  */
 export function ExportPanel({ pipeline, generatedImages, loading, filledCount, selectedImages }) {
     const {
@@ -24,6 +39,7 @@ export function ExportPanel({ pipeline, generatedImages, loading, filledCount, s
         refLightboxSrc, setRefLightboxSrc,
         generateGreenScreen, generateAllGreenScreens,
         handleExport, handleExportJPG, handleExportPDF,
+        generationAspectRatio,
     } = pipeline;
 
     return (
@@ -133,25 +149,41 @@ export function ExportPanel({ pipeline, generatedImages, loading, filledCount, s
             </div>
 
             {/* Optional resize */}
-            <div className="flex items-center gap-4">
-                <label className="text-sm font-medium min-w-fit">Redimensionner</label>
-                <div className="flex gap-2 flex-1 flex-wrap">
-                    {[
-                        { value: "", label: "Natif" },
-                        { value: "1024x1024", label: "1024x1024" },
-                        { value: "1560x2000", label: "1560x2000" },
-                        { value: "2048x2048", label: "2048x2048" },
-                        { value: "4096x4096", label: "4096x4096" },
-                    ].map(({ value, label }) => (
-                        <button
-                            key={value || "native"}
-                            onClick={() => setExportSize(value)}
-                            className={`py-1.5 px-3 rounded-md text-sm font-medium border transition-all ${exportSize === value ? "bg-primary text-primary-foreground border-primary" : "hover:bg-accent border-input"}`}
-                        >
-                            {label}
-                        </button>
-                    ))}
+            <div className="space-y-2">
+                <div className="flex items-center gap-4">
+                    <label className="text-sm font-medium min-w-fit">Redimensionner</label>
+                    <div className="flex gap-2 flex-1 flex-wrap">
+                        {EXPORT_SIZES.map(({ value, label }) => (
+                            <button
+                                key={value || "native"}
+                                onClick={() => setExportSize(value)}
+                                className={`py-1.5 px-3 rounded-md text-sm font-medium border transition-all ${exportSize === value ? "bg-primary text-primary-foreground border-primary" : "hover:bg-accent border-input"}`}
+                            >
+                                {label}
+                            </button>
+                        ))}
+                    </div>
                 </div>
+                {(() => {
+                    const genRatio = parseGenRatio(generationAspectRatio);
+                    const selected = EXPORT_SIZES.find((s) => s.value === exportSize);
+                    const mismatch =
+                        selected && selected.ratio && genRatio &&
+                        Math.abs(selected.ratio - genRatio) > 0.05;
+                    if (!mismatch) return null;
+                    return (
+                        <div className="flex gap-2 text-xs bg-amber-50 border border-amber-200 text-amber-800 rounded-md p-2.5 leading-snug">
+                            <span aria-hidden>⚠️</span>
+                            <span>
+                                Cette taille a un ratio différent de votre génération
+                                ({generationAspectRatio}) — l'image sera <strong>rognée sur les
+                                bords</strong>. Pour exporter sans perte, choisissez une taille
+                                compatible (ex : 2048×1152 pour 16:9, 2048×2048 pour 1:1) ou
+                                regénérez avec le ratio correspondant.
+                            </span>
+                        </div>
+                    );
+                })()}
             </div>
 
             {/* Export buttons */}
