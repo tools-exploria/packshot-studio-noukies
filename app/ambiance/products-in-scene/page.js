@@ -12,7 +12,7 @@ import { GalleryLightbox, SimpleLightbox } from "@/components/Lightbox";
 import { useGenerationPage } from "@/hooks/useGenerationPage";
 import { PROMPTS } from "@/lib/prompts";
 import { IMAGE_ROLES, buildInterleavedParts } from "@/lib/interleaved";
-import { ReformulableInput } from "@/components/Reformulable";
+import { ReformulableInput, ReformulableTextarea } from "@/components/Reformulable";
 
 const STEPS = ["Scène + Produits", "Génération", "Export"];
 
@@ -50,6 +50,10 @@ export default function ProductsInScenePage() {
 
     // ── Scene reference (1, required) ─────────────────────────
     const [sceneInput, setSceneInput] = useState(null);
+
+    // ── Scene tweaks (optional) — explicit modifications to the scene at this step
+    //    to avoid round-trips back to /ambiance/scene-builder when a small adjustment is needed.
+    const [sceneTweaks, setSceneTweaks] = useState("");
 
     // ── Products to place (1+, required) ──────────────────────
     const [productInputs, setProductInputs] = useState([]);
@@ -109,7 +113,11 @@ export default function ProductsInScenePage() {
                 description: inp.description || undefined,
             }));
 
-            const instruction = PROMPTS.productsInScene(productInputs.length, productNotes.trim());
+            const instruction = PROMPTS.productsInScene(
+                productInputs.length,
+                productNotes.trim(),
+                sceneTweaks.trim(),
+            );
             const parts = buildInterleavedParts(inputs, instruction);
 
             await runGenerateParts(parts, model);
@@ -180,19 +188,39 @@ export default function ProductsInScenePage() {
                                 preview={sceneInput?.preview}
                             />
                             {sceneInput && (
-                                <div>
-                                    <label className="text-xs font-medium text-muted-foreground mb-1 block">
-                                        Décrivez cette scène (optionnel mais utile)
-                                    </label>
-                                    <ReformulableInput
-                                        value={sceneInput.description}
-                                        onChange={updateSceneDesc}
-                                        placeholder="Ex: Chambre bébé lumineuse, palette crème et sage, lumière naturelle de fin d'après-midi"
-                                        context={{ agent: "ambiance-products-in-scene", role: "description", extras: { field: "scene" } }}
-                                        image={sceneInput.preview?.split(",")[1]}
-                                        disableReformulate
-                                    />
-                                </div>
+                                <>
+                                    <div>
+                                        <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                                            Décrivez cette scène (optionnel mais utile)
+                                        </label>
+                                        <ReformulableInput
+                                            value={sceneInput.description}
+                                            onChange={updateSceneDesc}
+                                            placeholder="Ex: Chambre bébé lumineuse, palette crème et sage, lumière naturelle de fin d'après-midi"
+                                            context={{ agent: "ambiance-products-in-scene", role: "description", extras: { field: "scene" } }}
+                                            image={sceneInput.preview?.split(",")[1]}
+                                            disableReformulate
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                                            Modifications de la scène (optionnel)
+                                        </label>
+                                        <ReformulableTextarea
+                                            value={sceneTweaks}
+                                            onChange={setSceneTweaks}
+                                            placeholder="Ex: mur plus chaud (terracotta clair), retirer le tableau au-dessus du lit, ajouter une lampe à gauche, lumière plus dorée…"
+                                            className="min-h-[80px]"
+                                            rows={3}
+                                            context={{ agent: "ambiance-products-in-scene", role: "sceneTweaks", extras: { productCount: productInputs.length } }}
+                                            image={sceneInput.preview?.split(",")[1]}
+                                        />
+                                        <p className="text-[11px] text-muted-foreground mt-1 leading-snug">
+                                            Évite les allers-retours vers <em>Créer une scène</em> : ajustez ici la scène
+                                            en même temps que vous y placez vos produits.
+                                        </p>
+                                    </div>
+                                </>
                             )}
                         </CardContent>
                     </Card>
