@@ -1,10 +1,6 @@
 "use client";
 import { useState } from "react";
 
-// Feature flag — masque les nouveaux agents (scene-builder + products-in-scene)
-// tant qu'ils ne sont pas validés. Active : NEXT_PUBLIC_ENABLE_PREVIEW_AGENTS=true
-const PREVIEW_AGENTS_ENABLED = process.env.NEXT_PUBLIC_ENABLE_PREVIEW_AGENTS === "true";
-
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -127,18 +123,20 @@ export default function AmbiancePage() {
                     className="px-3 py-1.5 text-sm font-medium rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors">
                     Scène chambre
                 </a>
-                {PREVIEW_AGENTS_ENABLED && (
-                    <>
-                        <a href="/ambiance/scene-builder"
-                            className="px-3 py-1.5 text-sm font-medium rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors">
-                            Créer une scène
-                        </a>
-                        <a href="/ambiance/products-in-scene"
-                            className="px-3 py-1.5 text-sm font-medium rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors">
-                            Produits dans scène
-                        </a>
-                    </>
-                )}
+                <a href="/ambiance/scene-builder"
+                    className="px-3 py-1.5 text-sm font-medium rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors">
+                    Créer une scène
+                </a>
+                {/*
+                  * "Produits dans scène" — retiré de la nav le 2026-05-26 en attendant
+                  * validation client. La route /ambiance/products-in-scene reste
+                  * accessible par URL directe pour le testing interne.
+                  * Pour réactiver la nav : décommenter le <a> ci-dessous.
+                  */}
+                {/* <a href="/ambiance/products-in-scene"
+                    className="px-3 py-1.5 text-sm font-medium rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors">
+                    Produits dans scène
+                </a> */}
             </div>
 
             <Stepper steps={STEPS} currentStep={step} />

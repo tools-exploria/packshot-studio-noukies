@@ -5,14 +5,6 @@ import { Sparkles, Undo2, Loader2 } from "lucide-react";
 import { ExplorerButton } from "./Explorer";
 
 /**
- * Feature flag — la reformulation IA est masquée par défaut.
- * Pour l'activer : NEXT_PUBLIC_ENABLE_REFORMULATE=true dans .env.local (ou Vercel env).
- * Quand désactivé, les composants ReformulableTextarea / ReformulableInput rendent
- * simplement leur textarea sans le bouton ✨ — aucun call site à modifier.
- */
-const REFORMULATE_ENABLED = process.env.NEXT_PUBLIC_ENABLE_REFORMULATE === "true";
-
-/**
  * Toolbar partagée : bouton ✨ Reformuler + bouton ↶ Undo persistant.
  * Si enableExplore=true, ajoute aussi un bouton 🎨 Explorer qui ouvre un panel
  * de 5 directions créatives à choisir (modes mood/customPrompt/freePrompt).
@@ -159,7 +151,7 @@ export function ReformulableTextarea({
 
     return (
         <div>
-            {REFORMULATE_ENABLED && !disableReformulate && (
+            {!disableReformulate && (
                 <ReformulateToolbar
                     value={value}
                     onChange={onChange}
@@ -208,7 +200,7 @@ export function ReformulableInput({
 
     return (
         <div>
-            {REFORMULATE_ENABLED && !disableReformulate && (
+            {!disableReformulate && (
                 <ReformulateToolbar
                     value={value}
                     onChange={onChange}

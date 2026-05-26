@@ -4,14 +4,6 @@ import { useState, useCallback } from "react";
 import { Wand2, X, Loader2 } from "lucide-react";
 
 /**
- * Feature flag — l'Explorer multi-direction est masqué par défaut.
- * Pour l'activer : NEXT_PUBLIC_ENABLE_EXPLORER=true dans .env.local (ou Vercel env).
- * Quand désactivé, le bouton "Explorer" ne s'affiche pas du tout — aucun call site
- * à modifier.
- */
-const EXPLORER_ENABLED = process.env.NEXT_PUBLIC_ENABLE_EXPLORER === "true";
-
-/**
  * Bouton "Explorer" + modal qui affiche 5 directions créatives.
  * Chaque carte = { title, recipe, anchor, prompt }. Cliquer → applique le prompt
  * au champ via onChange().
@@ -23,8 +15,6 @@ export function ExplorerButton({ value, onChange, context, image, onApplied }) {
     const [loading, setLoading] = useState(false);
     const [cards, setCards] = useState([]);
     const [error, setError] = useState(null);
-
-    if (!EXPLORER_ENABLED) return null;
 
     const handleClick = async () => {
         setOpen(true);

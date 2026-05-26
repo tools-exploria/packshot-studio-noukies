@@ -274,16 +274,24 @@ Tous les prompts lifestyle injectent `BRAND_BRIEF`. Les packshots gardent fond p
 
 ---
 
-## 🚧 Feature flags (preview features)
+## 🚧 État de release (2026-05-26)
 
-Deux flags d'env contrôlent l'affichage de features en cours de validation :
+**Live en prod** :
+- Tous les outils principaux (pattern, couleur, broderie, creation, pliage, ambiance, ambiance/room-scene, ambiance/scene-builder, labo)
+- Bouton ✨ Reformuler partout où il est câblé
+- Bouton 🎨 Explorer sur les 3 champs créatifs (`/ambiance` customPrompt, `/labo` freePrompt)
+- Agent **A1 — Créer une scène** (`/ambiance/scene-builder`) visible dans la nav `/ambiance`
 
-| Flag | Effet quand `=true` | Quand activer |
-|------|---------------------|---------------|
-| `NEXT_PUBLIC_ENABLE_REFORMULATE` | Affiche le bouton ✨ Reformuler au-dessus de tous les champs `Reformulable*` | Quand la reformulation Sonnet 4.6 est validée |
-| `NEXT_PUBLIC_ENABLE_PREVIEW_AGENTS` | Affiche les onglets *Créer une scène* (Agent A1 — scene-builder) et *Produits dans scène* (Agent A2 — products-in-scene) dans le sub-nav `/ambiance` | Quand les 2 agents sont validés |
+**En validation interne (route accessible par URL, masquée de la nav)** :
+- Agent **A2 — Produits dans scène** (`/ambiance/products-in-scene`) — préservé pour testing, en attendant validation client
 
-Routes `/ambiance/scene-builder` et `/ambiance/products-in-scene` accessibles par URL directe même sans flag (utile pour tester). `/api/reformulate` accessible aussi (mais sans bouton client pour l'invoquer si flag off). Quand on veut livrer ces features, on flippe les flags dans Vercel env vars.
+Tous les env vars `NEXT_PUBLIC_ENABLE_*` ont été supprimés du code le 2026-05-26 (commit
+`<voir git log>`). Si présents dans la config Vercel, ils sont devenus no-op et peuvent
+être nettoyés.
+
+Pour ré-activer la nav vers products-in-scene quand validé : décommenter le `<a>` dans
+`app/ambiance/page.js`, `app/ambiance/room-scene/page.js`, `app/ambiance/scene-builder/page.js`
+(rechercher `Produits dans scène` dans chaque fichier).
 
 ---
 
