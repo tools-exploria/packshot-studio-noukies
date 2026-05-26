@@ -72,7 +72,8 @@ export function GenerationControls({
             <div className="flex items-center gap-4">
                 <label className="text-sm font-medium min-w-fit">Ratio</label>
                 <div className="flex gap-2 flex-1 flex-wrap">
-                    {["1:1", "4:3", "3:4", "16:9", "9:16"].map((r) => (
+                    {/* Ratios exposés = allowlist côté serveur (app/api/generate/route.js) */}
+                    {["1:1", "4:5", "5:4", "3:4", "4:3", "2:3", "3:2", "9:16", "16:9"].map((r) => (
                         <button key={r} onClick={() => { clearPreset(); setAspectRatio(r); }}
                             className={`py-1.5 px-3 rounded-md text-sm font-medium border transition-all ${aspectRatio === r && !activePreset ? "bg-primary text-primary-foreground border-primary" : aspectRatio === r && activePreset ? "bg-primary/20 text-primary border-primary/50" : "hover:bg-accent border-input"}`}>
                             {r}
