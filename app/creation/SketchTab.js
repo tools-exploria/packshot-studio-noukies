@@ -13,6 +13,7 @@ import { useGenerationPage } from "@/hooks/useGenerationPage";
 import { PROMPTS } from "@/lib/prompts";
 import { IMAGE_ROLES, buildInterleavedParts } from "@/lib/interleaved";
 import { ReformulableInput } from "@/components/Reformulable";
+import { ToolDoc } from "@/components/ToolDoc";
 
 const STEPS = ["Images", "Generation", "Export"];
 
@@ -227,18 +228,7 @@ export default function SketchTab() {
 
     return (
         <>
-            <details className="mb-4 text-sm">
-                <summary className="cursor-pointer font-medium text-muted-foreground hover:text-foreground">
-                    Comment bien utiliser cet onglet ?
-                </summary>
-                <div className="mt-2 p-4 rounded-lg bg-muted/50 border space-y-2 text-muted-foreground text-[13px] leading-relaxed">
-                    <p><span className="font-semibold text-foreground">1. Ajoutez au moins une base</span> — un croquis, une photo smartphone ou un packshot. Plus vous en ajoutez, mieux le modele comprendra le produit.</p>
-                    <p><span className="font-semibold text-foreground">2. Choisissez le bon role</span> pour chaque image : un croquis sera interprete comme un guide de forme, une photo smartphone comme reference d'identite visuelle (couleurs, matieres).</p>
-                    <p><span className="font-semibold text-foreground">3. Decrivez chaque image</span> — meme une phrase courte aide enormement. Ex : "Croquis vue de face d'une gigoteuse avec manches longues" ou "Photo de la gigoteuse grise prise sur un canape".</p>
-                    <p><span className="font-semibold text-foreground">4. References complementaires</span> — la photo de base reste la source de verite. Ajoutez ici des refs pour : un angle non visible (ex : la tete d'une peluche cachee), un detail a reproduire precisement (etiquette CE, hardware) ou une matiere a reprendre d'un autre produit. <strong>Astuce fidelite</strong> : si un detail fin (etiquette, broderie, hardware) s'hallucine sur vos generations, croppez-le en zoom depuis votre photo de base et uploadez le crop ici en "Detail a preserver" — pas besoin d'une nouvelle photo, le crop concentre l'attention du modele sur cet element. Si vous voulez qu'une ref apparaisse dans le packshot final (ex : tete visible de face), precisez-le dans les notes a l'etape generation. Pour appliquer une matiere brute (swatch textile), utilisez plutot l'onglet <strong>"3D Produit"</strong>.</p>
-                    <p><span className="font-semibold text-foreground">5. Utilisez les notes</span> a l'etape generation pour preciser des details que les images ne montrent pas (ex : "le zip est dore", "doublure interieure blanche").</p>
-                </div>
-            </details>
+            <ToolDoc tool="creation-sketch" />
 
             <Stepper steps={STEPS} currentStep={step} />
 
