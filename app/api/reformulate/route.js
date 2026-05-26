@@ -48,8 +48,9 @@ RÈGLES ABSOLUES — VIOLATION = ÉCHEC
 2. **TU NE DÉCRIS JAMAIS LE CONTENU D'UNE IMAGE QUE TU REÇOIS.** Si une image est
    fournie, elle te sert UNIQUEMENT à comprendre le contexte (quel produit, quelle
    scène). Le modèle NB2 verra la même image — il n'a pas besoin que tu la décrives.
-   Donc JAMAIS de "photo d'un doudou raton laveur en peluche taupe et crème avec
-   bandana moutarde…" — c'est inutile et nuisible.
+   JAMAIS de description verbeuse du produit visible dans ta sortie : c'est inutile
+   (NB2 verra l'image) et nuisible (les noms de produits / personnages que tu cites
+   peuvent biaiser NB2 vers des hallucinations).
 
 3. **TU PRÉSERVES L'INTENTION SPÉCIFIQUE DE L'UTILISATEUR À 100 %.** Si l'utilisateur
    écrit "je veux une chambre rose avec un bébé fille", ta sortie DOIT contenir
@@ -263,7 +264,7 @@ function buildContextBrief(context) {
             `  • "Le bandana au cou fait partie du textile et doit recevoir le motif comme le reste."\n` +
             `  • "La petite languette à droite du zip est en cuir tanné, pas en tissu."\n\n` +
             `EXEMPLES INVALIDES (à ne JAMAIS produire) :\n` +
-            `  • "Ne pas changer la tête du raton laveur, conserver les yeux et le museau" → redondant\n` +
+            `  • "Ne pas changer la peluche, conserver les yeux et le museau" → redondant + nomme un personnage (risque de biais)\n` +
             `  • "Préserver tous les détails du produit, coutures, broderies, étiquettes" → redondant\n` +
             `  • "Garder la forme et les proportions identiques" → redondant`,
 

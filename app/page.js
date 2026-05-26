@@ -50,7 +50,7 @@ const MODES = [
   },
   {
     title: "Packshot",
-    description: "Générez un packshot professionnel à partir d'un croquis, d'une photo smartphone ou de packshots existants. Idéal pour prototyper de nouveaux produits.",
+    description: "Deux modes : Produit → Packshot (photo smartphone, packshot existant ou croquis vers packshot pro) ou Croquis → Packshot (fiche technique + matière vers flat-lay 3D).",
     href: "/creation",
     icon: "🖋️",
     badge: "3 étapes",

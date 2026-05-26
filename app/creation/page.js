@@ -4,8 +4,10 @@ import SketchTab from "./SketchTab";
 import ProduitTab from "./ProduitTab";
 
 const TABS = [
-    { key: "sketch", label: "Croquis → Packshot" },
-    { key: "produit", label: "3D Produit" },
+    // NOTE: tab key "sketch" historiquement = onglet Produit -> Packshot.
+    // Le renaming UI ne change pas la clef pour eviter les casses de routes/etat.
+    { key: "sketch", label: "Produit → Packshot" },
+    { key: "produit", label: "Croquis → Packshot" },
 ];
 
 export default function CreationPage() {
@@ -17,8 +19,8 @@ export default function CreationPage() {
                 <h1 className="text-2xl font-bold">Packshot</h1>
                 <p className="text-sm text-muted-foreground mt-1">
                     {tab === "sketch"
-                        ? "Genere un packshot professionnel a partir d'un croquis, d'une photo smartphone ou d'un packshot existant."
-                        : "Genere un packshot 3D a partir d'une fiche technique et d'une matiere."}
+                        ? "Genere un packshot professionnel a partir d'une photo smartphone, d'un packshot existant ou d'un croquis."
+                        : "Genere un packshot 3D flat-lay a partir d'une fiche technique (croquis du produit) et d'une matiere."}
                 </p>
             </div>
 

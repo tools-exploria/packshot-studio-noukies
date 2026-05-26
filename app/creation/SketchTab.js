@@ -28,7 +28,7 @@ const BASE_ROLE_OPTIONS = [
 // the chips just help the client know what kind of info is useful to write.
 const REF_TYPES = [
     { value: "detail",   label: "Detail a preserver",  hint: "Crop zoome d'un element (etiquette, hardware, broderie). Astuce: un crop de qualite est recommande, mais meme un crop depuis votre photo de base peut suffire a ameliorer le rendu — le modele dedie plus d'attention au detail zoome." },
-    { value: "angle",    label: "Angle non visible",   hint: "Ex: tete du raton laveur vue de face, taupe et creme. Visage du doudou de face si cache sur la base." },
+    { value: "angle",    label: "Angle non visible",   hint: "Ex: tete du personnage en peluche vue de face. A utiliser quand un detail (visage, accessoire, etiquette) est cache ou flou sur la photo de base." },
     { value: "material", label: "Texture / Matiere",   hint: "Ex: le velours cotele creme du dos, la mousseline bleue exacte, le coton bio jersey..." },
 ];
 const DEFAULT_REF_HINT = "Decrivez precisement ce que le modele doit reprendre de cette image.";
@@ -259,8 +259,9 @@ export default function SketchTab() {
                                 <span className="text-xs font-normal text-destructive ml-1">obligatoire</span>
                             </CardTitle>
                             <p className="text-sm text-muted-foreground">
-                                Les images qui definissent le produit : croquis, photo smartphone, packshot existant, fiche technique.
-                                Vous pouvez en ajouter plusieurs pour que le modele comprenne mieux l'objet.
+                                L'image qui definit le produit : photo smartphone, packshot existant ou croquis.
+                                Pour les details non visibles, les angles caches ou les matieres a reprendre,
+                                utilisez les references complementaires en section 2 plutot que d'ajouter une autre base.
                             </p>
                         </CardHeader>
                         <CardContent className="space-y-4">
@@ -278,11 +279,26 @@ export default function SketchTab() {
                                     ))}
                                 </div>
                             )}
-                            <UploadZone
-                                onFile={(f) => addImage(f, baseInputs, setBaseInputs, "sketch")}
-                                label={baseInputs.length === 0 ? "Ajoutez votre premiere base" : "Ajouter une autre base"}
-                                sublabel="Croquis, photo smartphone, packshot..."
-                            />
+                            {/*
+                              * MULTI-BASE UPLOAD — masque cachee 2026-05-26.
+                              *
+                              * Le code complet de support multi-base reste cable (BASE_ROLE_OPTIONS,
+                              * BaseImageCard, regles ROLE COMBINATION dans sketchToPackshot prompt) :
+                              * si le client redemande l'option (cas designer "sketch + photo
+                              * combines"), il suffit de retirer la condition baseInputs.length === 0
+                              * ci-dessous pour reactiver l'ajout d'une seconde base.
+                              *
+                              * Pour le moment : 1 seule base autorisee. Les besoins multi-image
+                              * (angles caches, details, matieres) passent par les references
+                              * complementaires en section 2 — modele mental plus clair pour le client.
+                              */}
+                            {baseInputs.length === 0 && (
+                                <UploadZone
+                                    onFile={(f) => addImage(f, baseInputs, setBaseInputs, "sketch")}
+                                    label="Ajoutez votre base"
+                                    sublabel="Photo smartphone, packshot existant ou croquis"
+                                />
+                            )}
                         </CardContent>
                     </Card>
 

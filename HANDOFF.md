@@ -30,8 +30,8 @@ app/
 ├── broderie/page.js              # Outil 3 — Broderie avec placement
 ├── creation/                     # Outil 4 — Création produit (2 onglets)
 │   ├── page.js                   #   Switch d'onglets
-│   ├── SketchTab.js              #   Croquis/photo → packshot (Image Manifest)
-│   └── ProduitTab.js             #   Fiche technique + swatch → flat-lay 3D
+│   ├── SketchTab.js              #   Produit → Packshot (photo/packshot/croquis → packshot, Image Manifest)
+│   └── ProduitTab.js             #   Croquis → Packshot (fiche technique + swatch → flat-lay 3D)
 ├── pliage/page.js                # Outil 5 — Disposition multi-vêtements
 ├── ambiance/                     # Outil 6 — Lifestyle (2 sous-routes)
 │   ├── page.js                   #   Scène produit (nursery / bébé / outdoor / custom)
@@ -81,8 +81,8 @@ generations.log                   # Log append-only de chaque génération (time
 | 1 | **Motif / Pattern** | `/pattern` | 5 (Produit → Pattern → Tiling → Génération → Export) | produit + motif + slider densité (1-20) | `PROMPTS.applyPattern` |
 | 2 | **Couleur / Matière** | `/couleur` | 4 (Produit → Couleur/Matière → Génération → Export) | mode **picker** (hex + 8 presets) OU **texture** (swatch upload) | `solidColor(hex, name, notes)` ou `applyTexture(notes)` |
 | 3 | **Broderie** | `/broderie` | 5 (Produit → Broderie → Placement → Génération → Export) | produit + design broderie + placement (gauche/droite/custom) | `applyEmbroidery(placement, notes)` |
-| 4a | **Packshot — Croquis** | `/creation` (tab sketch) | 3 (Images → Génération → Export) | N images base (sketch/photo/packshot) + N refs (existingProduct) avec rôles + descriptions | `sketchToPackshot(notes)` via **Image Manifest** |
-| 4b | **Packshot — 3D Produit** | `/creation` (tab produit) | 4 (Produit → Matière → Génération → Export) | fiche technique + swatch matière | `product3D(notes)` — timeout 180s |
+| 4a | **Produit → Packshot** | `/creation` (tab sketch, libellé UI « Produit → Packshot ») | 3 (Images → Génération → Export) | 1 image base (photo smartphone / packshot / croquis) + N refs complémentaires avec chips (Détail / Angle non visible / Texture) | `sketchToPackshot(notes)` via **Image Manifest** |
+| 4b | **Croquis → Packshot** | `/creation` (tab produit, libellé UI « Croquis → Packshot ») | 4 (Produit → Matière → Génération → Export) | fiche technique (croquis du produit) + swatch matière | `product3D(notes)` — timeout 180s |
 | 5 | **Pliage & Disposition** | `/pliage` | 3 (Images → Génération → Export) | 1 réf arrangement + N vêtements (avec descriptions) | `pliage(garmentCount, notes)` via **Image Manifest** |
 | 6a | **Photo d'ambiance** | `/ambiance` | 4 (Produit → Scène → Génération → Export) | type scène : `nursery_scene`, `baby_scene` (3 âges), `outdoor_scene` (3 lieux), `custom` | `nurseryScene` / `babyScene` / `outdoorScene` / `ambianceCustom` |
 | 6b | **Photo d'ambiance — Room scene** | `/ambiance/room-scene` | 3 (Produits → Génération → Export) | N produits + mood optionnel | `roomScene(productCount, mood, notes)` via **Image Manifest** |
