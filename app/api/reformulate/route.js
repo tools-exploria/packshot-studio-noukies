@@ -407,24 +407,29 @@ function buildContextBrief(context) {
  * limits and producing an opaque "Provider returned error 400". Compress
  * defensively. Images already small pass through untouched.
  */
+/**
+ * Always pipe through sharp + output JPEG. Two reasons:
+ *   1. Anthropic via Amazon Bedrock rejects requests when the declared mime
+ *      (we hardcode "image/jpeg") doesn't match the actual bytes (WebP/PNG/
+ *      HEIC from FileReader.readAsDataURL). Transcoding normalises this.
+ *   2. Large images get resized to ≤1568px (Anthropic recommended).
+ * Small images skip the resize step but still get transcoded so the mime
+ * declared matches the bytes sent.
+ */
 async function compressImageForAnthropic(b64) {
     const sizeKB = Math.round(b64.length / 1024);
-    if (sizeKB < 1200) {
-        console.log(`[reformulate] image ${sizeKB}KB — pass-through (under 1200KB)`);
-        return b64;
-    }
     try {
         const buffer = Buffer.from(b64, "base64");
-        const compressed = await sharp(buffer)
-            .rotate()
-            .resize(1568, 1568, { fit: "inside", withoutEnlargement: true })
-            .jpeg({ quality: 85, mozjpeg: true })
-            .toBuffer();
-        const newSizeKB = Math.round(compressed.length / 1024 * 4 / 3);
-        console.log(`[reformulate] image ${sizeKB}KB → ${newSizeKB}KB after sharp compression`);
-        return compressed.toString("base64");
+        let pipeline = sharp(buffer).rotate(); // honor EXIF orientation
+        if (sizeKB >= 1200) {
+            pipeline = pipeline.resize(1568, 1568, { fit: "inside", withoutEnlargement: true });
+        }
+        const out = await pipeline.jpeg({ quality: 88, mozjpeg: true }).toBuffer();
+        const newSizeKB = Math.round(out.length / 1024 * 4 / 3);
+        console.log(`[reformulate] image ${sizeKB}KB → ${newSizeKB}KB (transcoded to JPEG)`);
+        return out.toString("base64");
     } catch (err) {
-        console.warn("[reformulate] image compression failed, sending as-is:", err.message);
+        console.warn("[reformulate] image processing failed, sending as-is:", err.message);
         return b64;
     }
 }
@@ -504,11 +509,35 @@ export async function POST(request) {
 
         if (!res.ok) {
             const errBody = await res.text();
-            console.error(`[reformulate] HTTP ${res.status}:`, errBody.slice(0, 300));
-            return NextResponse.json(
-                { error: `API error ${res.status}` },
-                { status: 200 },
-            );
+            console.error(`[reformulate] HTTP ${res.status}:`, errBody.slice(0, 500));
+
+            // OpenRouter wraps the provider's actual error message inside
+            // data.error.metadata.raw (itself a JSON string). Surface it
+            // instead of a generic "API error 400".
+            let providerMessage = null;
+            let providerName = null;
+            try {
+                const errData = JSON.parse(errBody);
+                providerName = errData?.error?.metadata?.provider_name || null;
+                const rawString = errData?.error?.metadata?.raw;
+                if (rawString) {
+                    try {
+                        const parsed = JSON.parse(rawString);
+                        providerMessage = parsed?.message || parsed?.error?.message || null;
+                    } catch {
+                        providerMessage = rawString.slice(0, 200);
+                    }
+                }
+                if (!providerMessage) providerMessage = errData?.error?.message || null;
+            } catch {
+                // errBody was not JSON
+            }
+
+            const prefix = providerName ? `${providerName} (HTTP ${res.status})` : `HTTP ${res.status}`;
+            const userMessage = providerMessage
+                ? `${prefix} : ${providerMessage}`
+                : `Erreur ${res.status} du fournisseur (sans détail).`;
+            return NextResponse.json({ error: userMessage }, { status: 200 });
         }
 
         const data = await res.json();
