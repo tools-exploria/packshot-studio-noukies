@@ -49,10 +49,17 @@ export function useExportPipeline({ generatedImages, imageDims, resolution, aspe
     };
 
     // Generate a green screen / white bg version of a single image.
-    // ALWAYS resolves — wraps everything in try/finally so regeneratingIdx is
-    // cleaned up even on fetch error / timeout. Throws upward if caller wants
-    // to detect failure, but state never gets stuck.
-    const generateGreenScreen = async (idx) => {
+    // ALWAYS resolves — wraps everything in try/finally so state is cleaned
+    // up even on fetch error / timeout.
+    //
+    // `trackSingle` controls regeneratingIdx behaviour :
+    //   - true (default, used by single-tile retry) : sets regeneratingIdx to
+    //     idx during the call, clears it after. UI shows that tile as
+    //     "regenerating".
+    //   - false (used by batch parallel) : skips regeneratingIdx entirely so
+    //     concurrent calls don't fight over the single shared state. UI relies
+    //     on `loading=true` to mark every batch tile as in-progress.
+    const generateGreenScreen = async (idx, { trackSingle = true } = {}) => {
         const img = generatedImages[idx];
         if (!img) return false;
 
@@ -61,7 +68,7 @@ export function useExportPipeline({ generatedImages, imageDims, resolution, aspe
             ? PROMPTS.whiteBg
             : PROMPTS.chromaKeyBg(CHROMA_COLORS[chromaColor], chromaColor);
 
-        setRegeneratingIdx(idx);
+        if (trackSingle) setRegeneratingIdx(idx);
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), 120_000);
         try {
@@ -88,24 +95,35 @@ export function useExportPipeline({ generatedImages, imageDims, resolution, aspe
             return false;
         } finally {
             clearTimeout(timer);
-            setRegeneratingIdx(null);
+            if (trackSingle) setRegeneratingIdx(null);
         }
     };
 
-    // Generate green screens for selected images (or all if none selected).
-    // Loop continues even when one image fails — state is ALWAYS cleaned up in
-    // the finally block so the UI never gets stuck on "loading" / "detourProgress".
+    // Generate green screens for ALL selected images IN PARALLEL via Promise.all.
+    // Previous version was sequential (for + await) which scaled linearly with
+    // image count — 6 images = 6× the wait. Now they fire concurrently and
+    // resolve as they come back. detourProgress shows the count completed so
+    // far (e.g., "3/6"). State is always cleaned up in finally.
     const generateAllGreenScreens = async () => {
         setLoading(true);
         setError(null);
         try {
             const indices = getExportIndices();
+            setDetourProgress(`0/${indices.length}`);
+            let completed = 0;
             let failures = 0;
-            for (let n = 0; n < indices.length; n++) {
-                setDetourProgress(`${n + 1}/${indices.length}`);
-                const ok = await generateGreenScreen(indices[n]);
-                if (!ok) failures++;
-            }
+
+            await Promise.all(
+                indices.map((idx) =>
+                    generateGreenScreen(idx, { trackSingle: false }).then((ok) => {
+                        completed++;
+                        if (!ok) failures++;
+                        setDetourProgress(`${completed}/${indices.length}`);
+                        return ok;
+                    }),
+                ),
+            );
+
             if (failures > 0 && failures < indices.length) {
                 setError(`${failures} variante${failures > 1 ? "s ont" : " a"} échoué. Les autres sont disponibles.`);
             }
