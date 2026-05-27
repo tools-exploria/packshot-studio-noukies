@@ -1,6 +1,7 @@
 "use client";
 import { Button } from "@/components/ui/button";
 import { LoadingDots } from "@/components/shared";
+import { downloadImage } from "@/lib/api";
 
 /**
  * Available export sizes. Each carries its aspect ratio (w/h) so we can warn
@@ -38,9 +39,18 @@ export function ExportPanel({ pipeline, generatedImages, loading, filledCount, s
         exportSize, setExportSize,
         refLightboxSrc, setRefLightboxSrc,
         generateGreenScreen, generateAllGreenScreens,
+        getFileName,
         handleExport, handleExportJPG, handleExportPDF,
         generationAspectRatio,
     } = pipeline;
+
+    // Per-tile download — lets the user grab a ready image individually even
+    // when other images in the batch are still loading or have failed.
+    const downloadGreenScreenTile = (idx) => {
+        const img = greenScreenImages[idx];
+        if (!img) return;
+        downloadImage(img, getFileName(idx, "png"));
+    };
 
     return (
         <div className="space-y-4">
@@ -91,6 +101,7 @@ export function ExportPanel({ pipeline, generatedImages, loading, filledCount, s
                                 bgStyle="bg-white"
                                 onRegenerate={generateGreenScreen}
                                 onZoom={(src) => setRefLightboxSrc(src)}
+                                onDownload={downloadGreenScreenTile}
                             />
                         )}
                     </div>
@@ -142,6 +153,7 @@ export function ExportPanel({ pipeline, generatedImages, loading, filledCount, s
                                 chromaBg
                                 onRegenerate={generateGreenScreen}
                                 onZoom={(src) => setRefLightboxSrc(src)}
+                                onDownload={downloadGreenScreenTile}
                             />
                         )}
                     </div>
@@ -221,12 +233,12 @@ export function ExportPanel({ pipeline, generatedImages, loading, filledCount, s
 }
 
 // Internal sub-component: green screen preview grid
-function GreenScreenGrid({ generatedImages, greenScreenImages, loading, regeneratingIdx, selectedImages, label, bgStyle, chromaBg, onRegenerate, onZoom }) {
+function GreenScreenGrid({ generatedImages, greenScreenImages, loading, regeneratingIdx, selectedImages, label, bgStyle, chromaBg, onRegenerate, onZoom, onDownload }) {
     const hasSelection = selectedImages && selectedImages.size > 0;
     const inCurrentBatch = (idx) => !hasSelection || selectedImages.has(idx);
     return (
         <div className="space-y-2">
-            <p className="text-xs font-medium text-muted-foreground">{label} — cliquez 🔄 pour relancer</p>
+            <p className="text-xs font-medium text-muted-foreground">{label} — 🔄 relancer • ⬇ télécharger</p>
             <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                 {generatedImages.map((img, idx) => {
                     if (!img) return null;
@@ -262,6 +274,13 @@ function GreenScreenGrid({ generatedImages, greenScreenImages, loading, regenera
                                         className="absolute top-1 right-1 w-6 h-6 rounded-full bg-white/90 hover:bg-white flex items-center justify-center text-xs shadow disabled:opacity-50"
                                         title="Relancer"
                                     >{isRegenerating ? <LoadingDots /> : "🔄"}</button>
+                                    {onDownload && (
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); onDownload(idx); }}
+                                            className="absolute bottom-7 right-1 w-6 h-6 rounded-full bg-white/90 hover:bg-white flex items-center justify-center text-xs shadow"
+                                            title="Télécharger cette image"
+                                        >⬇</button>
+                                    )}
                                     <button
                                         onClick={(e) => { e.stopPropagation(); onZoom(`data:image/png;base64,${greenScreenImages[idx]}`); }}
                                         className="absolute top-1 left-1 w-6 h-6 rounded-full bg-white/90 hover:bg-white flex items-center justify-center text-xs shadow"

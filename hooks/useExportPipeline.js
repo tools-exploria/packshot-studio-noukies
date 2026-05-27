@@ -48,10 +48,13 @@ export function useExportPipeline({ generatedImages, imageDims, resolution, aspe
         setDetouredImages({});
     };
 
-    // Generate a green screen / white bg version of a single image
+    // Generate a green screen / white bg version of a single image.
+    // ALWAYS resolves — wraps everything in try/finally so regeneratingIdx is
+    // cleaned up even on fetch error / timeout. Throws upward if caller wants
+    // to detect failure, but state never gets stuck.
     const generateGreenScreen = async (idx) => {
         const img = generatedImages[idx];
-        if (!img) return;
+        if (!img) return false;
 
         const CHROMA_COLORS = { green: "#00FF00", magenta: "#FF00FF", blue: "#0000FF" };
         const prompt = bgMode === "white"
@@ -59,32 +62,57 @@ export function useExportPipeline({ generatedImages, imageDims, resolution, aspe
             : PROMPTS.chromaKeyBg(CHROMA_COLORS[chromaColor], chromaColor);
 
         setRegeneratingIdx(idx);
-        const res = await fetch("/api/generate", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ prompt, images: [img], model: MODELS.FLASH, resolution, aspectRatio }),
-        });
-        const data = await res.json();
-        setRegeneratingIdx(null);
-        if (data.status === "success" && data.image) {
-            setGreenScreenImages((prev) => ({ ...prev, [idx]: data.image }));
-            setDetouredImages((prev) => { const next = { ...prev }; delete next[idx]; return next; });
-        } else {
-            setError(`Échec fond: ${data.error || "Pas d'image"}`);
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 120_000);
+        try {
+            const res = await fetch("/api/generate", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ prompt, images: [img], model: MODELS.FLASH, resolution, aspectRatio }),
+                signal: controller.signal,
+            });
+            const data = await res.json();
+            if (data.status === "success" && data.image) {
+                setGreenScreenImages((prev) => ({ ...prev, [idx]: data.image }));
+                setDetouredImages((prev) => { const next = { ...prev }; delete next[idx]; return next; });
+                return true;
+            }
+            setError(`Échec fond variante ${idx + 1} : ${data.error || "pas d'image"}`);
+            return false;
+        } catch (err) {
+            if (err.name === "AbortError") {
+                setError(`Timeout fond variante ${idx + 1} (120s)`);
+            } else {
+                setError(`Échec fond variante ${idx + 1} : ${err.message || "erreur réseau"}`);
+            }
+            return false;
+        } finally {
+            clearTimeout(timer);
+            setRegeneratingIdx(null);
         }
     };
 
-    // Generate green screens for selected images (or all if none selected)
+    // Generate green screens for selected images (or all if none selected).
+    // Loop continues even when one image fails — state is ALWAYS cleaned up in
+    // the finally block so the UI never gets stuck on "loading" / "detourProgress".
     const generateAllGreenScreens = async () => {
         setLoading(true);
         setError(null);
-        const indices = getExportIndices();
-        for (let n = 0; n < indices.length; n++) {
-            setDetourProgress(`${n + 1}/${indices.length}`);
-            await generateGreenScreen(indices[n]);
+        try {
+            const indices = getExportIndices();
+            let failures = 0;
+            for (let n = 0; n < indices.length; n++) {
+                setDetourProgress(`${n + 1}/${indices.length}`);
+                const ok = await generateGreenScreen(indices[n]);
+                if (!ok) failures++;
+            }
+            if (failures > 0 && failures < indices.length) {
+                setError(`${failures} variante${failures > 1 ? "s ont" : " a"} échoué. Les autres sont disponibles.`);
+            }
+        } finally {
+            setDetourProgress(null);
+            setLoading(false);
         }
-        setDetourProgress(null);
-        setLoading(false);
     };
 
     // Prepare images for export (apply chroma key if needed)
