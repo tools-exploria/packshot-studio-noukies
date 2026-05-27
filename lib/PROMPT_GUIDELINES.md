@@ -983,6 +983,12 @@ verbatim when relevant.
 | **"Same white background and lighting setup as reference"** | For multi-angle series consistency |
 | **"Match the exact product appearance, color, and material from the reference images"** | For any multi-ref workflow |
 | **"Editorial fashion photography"** | Legitimate-intent signal — reduces filter false positives |
+| **"The product takes on the scene's lighting direction, colour temperature, and shadow direction"** | Anti-cutout : forces re-lighting of packshot to match scene ambient (added 2026-05-27 from external research) |
+| **"Cast a natural contact shadow under the product, matching the scene's main light source"** | Anti-cutout : ensures product anchors to surface, doesn't "float" |
+| **"Subtle colour bleed from surrounding scene elements onto the product"** | Anti-cutout : product picks up ambient tones (warm wood → warm tint, blue wall → cool tint) |
+| **"Matching grain, noise level, and depth-of-field across product and scene"** | Anti-cutout : prevents the "sharper than the scene" pasted-on look |
+| **"Indistinguishable from a real photograph taken in this scene"** | Quality target framing — stronger than "feels intentional" |
+| **"Single light source casting consistent shadows across all objects, no conflicting shadow directions"** | Multi-product scene consistency — prevents each product inheriting its own packshot light direction |
 
 **Two rules when using anchors:**
 1. **Add them where they fit, don't stuff.** Each anchor should earn its place by addressing
@@ -1164,4 +1170,153 @@ and "Lighting: Soft diffused natural light" → bouillie côté NB2.
 **When adding a new agent**, check whether the new text input field is a free-form
 slot (full prompt) or a structured injection (one line). Only the first kind gets
 `enableExplore` on its `ReformulableInput` / `ReformulableTextarea`.
+
+### 14.13 Product-into-scene integration (anti-cutout look)
+
+> **Why this section exists.** When NB2 receives a packshot (flat studio
+> lighting on white) plus a scene reference (golden hour, directional light,
+> ambient color), it tends to drop the packshot on top of the scene with its
+> original lighting intact — the dreaded "photoshop cutout" look. Consolidated
+> from external sources (rewarx.com shadow prompt guide, artsmart.ai room
+> designer guide, Google Cloud Vertex AI Gemini docs).
+
+**The 5-part integration prompt structure** validated by external testing :
+
+```
+[Subject in position] + [surface material] + [light position] + [shadow specification] + [environment context]
+```
+
+Example from Rewarx (tested) :
+> *"Studio photograph of leather handbag on **concrete floor**, single
+> **softbox light source at 45 degrees upper-left**, realistic **soft cast
+> shadow with 15-degree diffusion**, slight reflection on floor surface,
+> clean background."*
+
+Apply to a Noukies use case :
+> *"Plush raccoon sitting on the **oak parquet floor** of a Parisian
+> apartment, **window light from camera-right at 45 degrees**, soft
+> **15-degree diffused cast shadow** falling to the camera-left, subtle
+> warm reflection of the parquet onto the plush's lower fur."*
+
+**Light direction lock — 3 validated phrasings** :
+
+| Approach | Example |
+|---|---|
+| Clock position | *"key light at 2 o'clock"* (upper-right) |
+| Degree from camera | *"45-degree angle from camera-left"* |
+| Height descriptor | *"low-angle window light"* / *"overhead diffused light"* |
+
+**Shadow hardness vocabulary** :
+
+| Effect | Phrase |
+|---|---|
+| Midday sun, dramatic | *"hard shadow with crisp edges"* |
+| Natural window light | *"soft shadow with 15-degree diffusion"* |
+| Overhead skylight | *"short concentrated shadow directly under the subject"* |
+| Golden hour | *"long dramatic cast shadow stretching to camera-left"* |
+| Studio softbox | *"soft penumbra fading at the edges"* |
+
+**Surface material specification is CRITICAL** :
+
+NB2 needs to know the surface the shadow falls on to compute realistic
+shadow behaviour. Always specify :
+
+| Surface | Behaviour cue |
+|---|---|
+| `concrete floor` | Sharp shadow, low bounce |
+| `polished hardwood` | Shadow + faint product reflection on surface |
+| `white marble` | Soft shadow + ambient light bounce |
+| `velvet` / `wool rug` | Absorbed shadow, deep, soft edges |
+| `linen fabric` | Soft shadow with visible micro-texture |
+| `oak parquet` | Warm-toned shadow with subtle reflection |
+
+**Multi-object consistency rule** :
+
+> *"Single light source casting consistent shadows across all objects, no
+> conflicting shadow directions."*
+
+Without this, NB2 may give each product its own light direction inherited
+from its individual packshot. Always include this for multi-product scenes.
+
+**Validated anti-cutout anchors** (additions to §14.4 anchors table) :
+
+- *"The product takes on the scene's lighting direction, colour temperature, and shadow direction"*
+- *"Cast a natural contact shadow under the product, matching the scene's main light source"*
+- *"Subtle colour bleed from surrounding scene elements onto the product"*
+- *"Matching grain, noise level, and depth-of-field across product and scene"*
+- *"Indistinguishable from a real photograph taken in this scene"*
+
+### 14.14 Scale & size control of objects in a scene
+
+> **Why this section exists.** NB2 does NOT understand physical units
+> (cm, mm, inches) — they are interpreted loosely. Asking for "30cm" gives
+> random scale. Verified across OpenAI GPT image guide, Midjourney guides,
+> and Stable Diffusion XL tutorials.
+
+**The 4 methods, ranked by reliability for NB2** :
+
+#### 1. 🏆 Comparative natural language (most reliable)
+
+Compare the target object's size to ANOTHER object that's already in the
+scene or that the model can mentally anchor to.
+
+✅ *"the doudou is approximately the size of a folded blanket on the stool"*
+✅ *"twice the height of the wooden abacus"*
+✅ *"child-sized relative to the dining table"* (OpenAI's validated example)
+
+❌ *"30cm × 30cm"* (no anchor, interpreted loosely)
+❌ *"medium-sized"* (subjective, model picks anything)
+
+#### 2. 🥈 Camera language implies scale
+
+Camera framing dictates how big the object appears in frame.
+
+| Phrase | Result |
+|---|---|
+| *"wide shot of the entire room, 35mm lens"* | Object small in context |
+| *"medium shot at eye-level, 50mm lens"* | Natural human-perspective scale |
+| *"close-up at f/2.8"* | Object dominates the frame |
+| *"macro 1:1 ratio"* | Extreme detail, no scale context |
+
+#### 3. 🥉 Composition anchors (% of frame)
+
+✅ *"Product occupies approximately 30% of the frame width"*
+✅ *"In the foreground, slightly left of center, half the height of the chair"*
+✅ *"Sitting on the chair, against the back, two-thirds of the seat width"*
+
+#### 4. 🧰 Scaffolding visual (precise but manual)
+
+User draws a coloured rectangle on the scene image at the exact position
+and size desired for the product. Prompt :
+
+> *"Replace the magenta rectangle with the product. The product fills the
+> rectangle's area exactly, matching its position and size. Remove all
+> traces of magenta from the output."*
+
+**⚠️ Critical caveat on scaffolding colour choice** :
+
+Choose a colour that does NOT exist in the scene. If the scene has natural
+green elements (sage walls, green plants, eucalyptus), DO NOT use green
+rectangles — NB2 will confuse them with the natural greens and either fail
+to remove them, or remove the natural greens too.
+
+| Scene type | Safe scaffolding colour |
+|---|---|
+| Indoor pastel / Noukies aesthetic | `magenta #FF00FF` or `hot pink #FF1493` |
+| Studio with bright accents | `electric purple #B400FF` |
+| Outdoor / nature | `magenta` or `cyan #00FFFF` |
+| Generic | `magenta` is the safest universal choice — almost never appears naturally |
+
+**⚠️ Avoid writing numbers/text INSIDE the rectangles** if you have multiple
+placeholders — NB2 may interpret the digits as part of what to render.
+Instead, use **distinct shapes** (rectangle 1, ellipse 2, triangle 3) or
+**reference position** in the prompt ("the rectangle on the left", "the
+rectangle nearest the window").
+
+**What doesn't work for size control on NB2** :
+
+- ❌ Absolute measurements (cm, mm, inches) — no physical unit understanding
+- ❌ Vague modifiers (*"larger"*, *"smaller"*, *"medium"*) without anchor
+- ❌ Multi-measure mixing (*"30cm wide and the size of a coffee mug"* — conflicting)
+- ❌ "Make it 50% of the chair" — percentages without visual reference
 
