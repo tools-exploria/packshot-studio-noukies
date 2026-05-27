@@ -1,8 +1,18 @@
 import { NextResponse } from "next/server";
 import { appendFileSync } from "fs";
 import { join } from "path";
+import sharp from "sharp";
 
 const LOG_FILE = join(process.cwd(), "generations.log");
+
+// Vercel serverless functions cap the response body at ~4.5MB on Hobby plan.
+// 4K NB2 outputs can exceed this in PNG, producing "Unterminated string in
+// JSON at position 10MB" errors client-side because the JSON gets truncated
+// mid-stream. We re-encode to JPEG q92 above this threshold — JPEG q92 is
+// visually identical to PNG for photographic content but roughly 1/5 the
+// size, so a 10MB PNG comfortably fits as a 1-2MB JPEG.
+const RESPONSE_SIZE_THRESHOLD_BYTES = 4 * 1024 * 1024;
+const JPEG_FALLBACK_QUALITY = 92;
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const API_KEY = process.env.OPENROUTER_API_KEY;
@@ -114,8 +124,26 @@ export async function POST(request) {
         }
 
         // Extract base64 from data URL
-        const b64 = imageUrl.includes("base64,") ? imageUrl.split("base64,")[1] : imageUrl;
-        console.log(`[generate] Success — image size: ${Math.round(b64.length / 1024)}KB`);
+        let b64 = imageUrl.includes("base64,") ? imageUrl.split("base64,")[1] : imageUrl;
+        const originalSizeKB = Math.round(b64.length / 1024);
+        console.log(`[generate] Success — image size: ${originalSizeKB}KB`);
+
+        // Conditional JPEG q92 re-encode when the response would exceed Vercel's
+        // ~4.5MB body cap. Only kicks in for 4K outputs typically (1K/2K stay
+        // well under, passed through unchanged). JPEG q92 of a photograph is
+        // visually identical to the PNG source but ~5x smaller.
+        if (b64.length > RESPONSE_SIZE_THRESHOLD_BYTES) {
+            try {
+                const buffer = Buffer.from(b64, "base64");
+                const compressed = await sharp(buffer)
+                    .jpeg({ quality: JPEG_FALLBACK_QUALITY, mozjpeg: true })
+                    .toBuffer();
+                b64 = compressed.toString("base64");
+                console.log(`[generate] Output ${originalSizeKB}KB → ${Math.round(b64.length / 1024)}KB (JPEG q${JPEG_FALLBACK_QUALITY} fallback, was >4MB)`);
+            } catch (err) {
+                console.warn(`[generate] JPEG re-encode failed, sending original ${originalSizeKB}KB (may be truncated by Vercel):`, err.message);
+            }
+        }
 
         // Log to file for tracking
         try {
