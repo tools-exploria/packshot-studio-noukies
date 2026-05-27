@@ -72,10 +72,20 @@ export function useExportPipeline({ generatedImages, imageDims, resolution, aspe
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), 120_000);
         try {
+            // For transparent (chromakey) mode, ask the server to flatten the chroma
+            // background before returning. NB2 is unreliable at producing uniform
+            // chroma fills (mottled near-green patterns at 4K), so server-side
+            // post-processing guarantees a clean uniform background that chromakey
+            // can then key cleanly. For white mode, no flatten — the prompt
+            // already targets pure white and the chromakey isn't involved.
+            const requestBody = { prompt, images: [img], model: MODELS.FLASH, resolution, aspectRatio };
+            if (bgMode === "transparent") {
+                requestBody.flattenChroma = chromaColor;
+            }
             const res = await fetch("/api/generate", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ prompt, images: [img], model: MODELS.FLASH, resolution, aspectRatio }),
+                body: JSON.stringify(requestBody),
                 signal: controller.signal,
             });
             const data = await res.json();
