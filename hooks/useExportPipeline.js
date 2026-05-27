@@ -1,7 +1,24 @@
 "use client";
 import { useState } from "react";
-import { MODELS } from "@/lib/api";
+import { MODELS, compressBase64Image } from "@/lib/api";
 import { PROMPTS } from "@/lib/prompts";
+
+// Parse a fetch response as JSON, but fall back to a readable error when the
+// body is plain text — typically Vercel's "Request Entity Too Large" (413)
+// when the request body exceeds 4.5MB. Without this, the caller sees the
+// cryptic "Unexpected token 'R'..." from JSON.parse.
+async function parseResponseOrThrow(res, fallbackLabel = "Échec de la requête") {
+    const text = await res.text();
+    try {
+        return JSON.parse(text);
+    } catch {
+        // Body isn't JSON — surface the raw error
+        if (res.status === 413 || /entity too large/i.test(text)) {
+            throw new Error("Image trop volumineuse (>4.5MB) — la compression devrait empêcher ce cas, signalez ce bug.");
+        }
+        throw new Error(`${fallbackLabel} (HTTP ${res.status}) : ${text.slice(0, 120)}`);
+    }
+}
 
 /** Trigger a browser download from a base64 string. Infers MIME from extension. */
 function downloadB64(b64, filename) {
@@ -72,13 +89,22 @@ export function useExportPipeline({ generatedImages, imageDims, resolution, aspe
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), 120_000);
         try {
+            // Compress the source variant before sending to /api/generate.
+            // Generated 2K PNGs can be 5-7MB base64 — exceeds Vercel's 4.5MB
+            // body limit and triggers the cryptic "Request Entity Too Large"
+            // / "Unexpected token 'R'" error. compressBase64Image downscales
+            // to 2048px JPEG quality 0.85 → ~500-800KB, well under the limit.
+            // Quality loss is fine here because NB2 regenerates the image
+            // with a clean background anyway.
+            const compressedImg = await compressBase64Image(img, "image/png");
+
             const res = await fetch("/api/generate", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ prompt, images: [img], model: MODELS.FLASH, resolution, aspectRatio }),
+                body: JSON.stringify({ prompt, images: [compressedImg], model: MODELS.FLASH, resolution, aspectRatio }),
                 signal: controller.signal,
             });
-            const data = await res.json();
+            const data = await parseResponseOrThrow(res, `Échec fond variante ${idx + 1}`);
             if (data.status === "success" && data.image) {
                 setGreenScreenImages((prev) => ({ ...prev, [idx]: data.image }));
                 setDetouredImages((prev) => { const next = { ...prev }; delete next[idx]; return next; });
@@ -162,7 +188,7 @@ export function useExportPipeline({ generatedImages, imageDims, resolution, aspe
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ image: greenScreenImages[idx], color: chromaColor }),
                     });
-                    const chromaData = await chromaRes.json();
+                    const chromaData = await parseResponseOrThrow(chromaRes, `Échec chromakey variante ${idx + 1}`);
                     if (chromaData.result) {
                         img = chromaData.result;
                         setDetouredImages((prev) => ({ ...prev, [idx]: img }));
