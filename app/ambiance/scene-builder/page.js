@@ -74,8 +74,7 @@ export default function SceneBuilderPage() {
                 <a href="/ambiance" className="px-3 py-1.5 text-sm font-medium rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors">Scène produit</a>
                 <a href="/ambiance/room-scene" className="px-3 py-1.5 text-sm font-medium rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors">Scène chambre</a>
                 <a href="/ambiance/scene-builder" className="px-3 py-1.5 text-sm font-semibold rounded-lg bg-primary/10 text-primary">Créer une scène</a>
-                {/* "Produits dans scène" — retiré 2026-05-26, en validation. Route accessible par URL. */}
-                {/* <a href="/ambiance/products-in-scene" className="px-3 py-1.5 text-sm font-medium rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors">Produits dans scène</a> */}
+                <a href="/ambiance/products-in-scene" className="px-3 py-1.5 text-sm font-medium rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors">Produits dans scène</a>
             </div>
 
             <div className="mb-6">

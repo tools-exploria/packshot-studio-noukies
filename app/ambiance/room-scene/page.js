@@ -128,16 +128,10 @@ export default function RoomScenePage() {
                     className="px-3 py-1.5 text-sm font-medium rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors">
                     Créer une scène
                 </a>
-                {/*
-                  * "Produits dans scène" — retiré de la nav le 2026-05-26 en attendant
-                  * validation client. La route /ambiance/products-in-scene reste
-                  * accessible par URL directe pour le testing interne.
-                  * Pour réactiver la nav : décommenter le <a> ci-dessous.
-                  */}
-                {/* <a href="/ambiance/products-in-scene"
+                <a href="/ambiance/products-in-scene"
                     className="px-3 py-1.5 text-sm font-medium rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors">
                     Produits dans scène
-                </a> */}
+                </a>
             </div>
 
             <div className="mb-6">
