@@ -64,11 +64,10 @@ export default function ProductsInScenePage() {
             setSceneInput({
                 file: f,
                 preview: e.target.result,
-                role: "scene",
-                // No `description` — the manifest already labels the image as
-                // SCENE / ENVIRONMENT REFERENCE with extract/ignore rules. Asking
-                // the user to describe the scene was redundant + confusing.
-                // Actionable scene changes go in sceneTweaks, not here.
+                // sceneInspiration (not scene) : extract palette/light/mood
+                // but NOT composition — the layout is adapted around products.
+                // Avoids contradiction with the prompt's "adapt framing".
+                role: "sceneInspiration",
             });
         };
         reader.readAsDataURL(f);
@@ -79,7 +78,11 @@ export default function ProductsInScenePage() {
         reader.onload = (e) => {
             setProductInputs((prev) => [
                 ...prev,
-                { file: f, preview: e.target.result, role: "roomProduct", description: "" },
+                // productInScene (not roomProduct) : the scene isn't necessarily
+                // a room. Label sent to NB2 is generic ("PRODUCT TO INTEGRATE
+                // INTO THE SCENE") and includes a hint that descriptions may
+                // also carry placement info.
+                { file: f, preview: e.target.result, role: "productInScene", description: "" },
             ]);
         };
         reader.readAsDataURL(f);
@@ -216,6 +219,10 @@ export default function ProductsInScenePage() {
                             <p className="text-sm text-muted-foreground">
                                 Packshots détourés des produits Noukies. Leur identité (couleur, matière, motif)
                                 sera préservée à 100 %.
+                                <br />
+                                <strong>Astuce</strong> : dans la description de chaque produit, indiquez aussi
+                                <strong> où le placer dans la scène</strong> (ex&nbsp;: « sur le fauteuil », « sur
+                                le tapis au premier plan »). C'est là que le modèle lit l'emplacement souhaité.
                             </p>
                             <p className="text-xs text-amber-600 mt-1">
                                 Jusqu'à 6 produits pour une fidélité optimale (max 14).
@@ -235,7 +242,9 @@ export default function ProductsInScenePage() {
                                             </div>
                                             <div className="flex-1 space-y-2 min-w-0">
                                                 <div className="flex items-center gap-2">
-                                                    <span className="text-sm font-medium text-muted-foreground">Produit {i + 1}</span>
+                                                    <span className="text-sm font-medium text-muted-foreground">
+                                                        Produit {i + 1} — <em className="font-normal">description + emplacement</em>
+                                                    </span>
                                                     <button onClick={() => removeProduct(i)}
                                                         className="text-destructive hover:text-destructive/80 text-xs font-medium ml-auto">
                                                         Supprimer
