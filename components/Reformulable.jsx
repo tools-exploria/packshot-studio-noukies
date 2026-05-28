@@ -3,6 +3,25 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Sparkles, Undo2, Loader2 } from "lucide-react";
 import { ExplorerButton } from "./Explorer";
+import { compressBase64Image } from "@/lib/api";
+
+/**
+ * Safe JSON parse — falls back to readable text when the response isn't JSON
+ * (e.g. Vercel's plain-text "Request Entity Too Large" on 413). Without this,
+ * res.json() throws "JSON.parse: unexpected character at line 1 column 1"
+ * which exposes nothing actionable to the user.
+ */
+async function safeJsonResponse(res) {
+    const text = await res.text();
+    try {
+        return JSON.parse(text);
+    } catch {
+        if (res.status === 413 || /entity too large/i.test(text)) {
+            return { error: "Image trop volumineuse — la compression devrait empêcher ce cas, signalez-le." };
+        }
+        return { error: `Réponse invalide du serveur (HTTP ${res.status}) : ${text.slice(0, 120)}` };
+    }
+}
 
 /**
  * Toolbar partagée : bouton ✨ Reformuler + bouton ↶ Undo persistant.
@@ -26,12 +45,28 @@ function ReformulateToolbar({ value, onChange, context, image, enableExplore }) 
         setLoading(true);
         const before = value;
         try {
+            // Compress the image client-side BEFORE sending. Raw productPreview
+            // can be 5-10MB at 4K — Vercel rejects bodies >4.5MB with a plain
+            // text "Request Entity Too Large" response, which then crashes
+            // res.json() with "JSON.parse: unexpected character...". Compressing
+            // to a 2048px JPEG keeps the body well under the limit.
+            let payloadImage = image;
+            if (image) {
+                try {
+                    payloadImage = await compressBase64Image(image, "image/jpeg");
+                } catch {
+                    // If compression fails (rare), fall back to raw image.
+                    // If it's too big, safeJsonResponse will surface a clear error.
+                    payloadImage = image;
+                }
+            }
+
             const res = await fetch("/api/reformulate", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ text: value || "", context, image }),
+                body: JSON.stringify({ text: value || "", context, image: payloadImage }),
             });
-            const data = await res.json();
+            const data = await safeJsonResponse(res);
             if (data.error || !data.result) {
                 setError(data.error || "Réponse vide");
                 return;

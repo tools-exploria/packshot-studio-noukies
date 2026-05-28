@@ -2,6 +2,23 @@
 
 import { useState, useCallback } from "react";
 import { Wand2, X, Loader2 } from "lucide-react";
+import { compressBase64Image } from "@/lib/api";
+
+/**
+ * Safe JSON parse — falls back to readable text when the response isn't JSON
+ * (e.g. Vercel's plain-text "Request Entity Too Large" on 413).
+ */
+async function safeJsonResponse(res) {
+    const text = await res.text();
+    try {
+        return JSON.parse(text);
+    } catch {
+        if (res.status === 413 || /entity too large/i.test(text)) {
+            return { error: "Image trop volumineuse — la compression devrait empêcher ce cas, signalez-le." };
+        }
+        return { error: `Réponse invalide du serveur (HTTP ${res.status}) : ${text.slice(0, 120)}` };
+    }
+}
 
 /**
  * Bouton "Explorer" + modal qui affiche 5 directions créatives.
@@ -22,12 +39,24 @@ export function ExplorerButton({ value, onChange, context, image, onApplied }) {
         setError(null);
         setCards([]);
         try {
+            // Compress client-side before sending (raw 4K images blow past
+            // Vercel's 4.5MB inbound body cap → plain-text 413 → JSON.parse
+            // error on res.json). Same fix as Reformulable.
+            let payloadImage = image;
+            if (image) {
+                try {
+                    payloadImage = await compressBase64Image(image, "image/jpeg");
+                } catch {
+                    payloadImage = image;
+                }
+            }
+
             const res = await fetch("/api/explore", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ text: value || "", context, image }),
+                body: JSON.stringify({ text: value || "", context, image: payloadImage }),
             });
-            const data = await res.json();
+            const data = await safeJsonResponse(res);
             if (data.error || !data.cards) {
                 setError(data.error || "Réponse vide");
                 return;
