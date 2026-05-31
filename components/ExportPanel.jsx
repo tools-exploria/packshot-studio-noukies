@@ -4,17 +4,22 @@ import { LoadingDots } from "@/components/shared";
 import { downloadImage } from "@/lib/api";
 
 /**
- * Available export sizes. Each carries its aspect ratio (w/h) so we can warn
- * the user when they pick a size that doesn't match the generation ratio.
+ * Available export sizes. Each carries :
+ *   - label    : semantic name (matches the GENERATION_PRESETS naming in
+ *                useGenerationPage.js, so the mental bridge between
+ *                "generate at Packshot 4:5" and "export at Packshot 4:5"
+ *                is obvious)
+ *   - subLabel : raw dimensions for clarity
+ *   - ratio    : aspect ratio (w/h) used to detect mismatch with generation
  */
 const EXPORT_SIZES = [
-    { value: "", label: "Natif", ratio: null },
-    { value: "1024x1024", label: "1024×1024", ratio: 1 },
-    { value: "2048x2048", label: "2048×2048", ratio: 1 },
-    { value: "4096x4096", label: "4096×4096", ratio: 1 },
-    { value: "1560x2000", label: "1560×2000", ratio: 1560 / 2000 },
-    { value: "2048x1152", label: "2048×1152", ratio: 2048 / 1152 },
-    { value: "1152x2048", label: "1152×2048", ratio: 1152 / 2048 },
+    { value: "",           label: "Natif",         subLabel: "taille d'origine", ratio: null },
+    { value: "1024x1024",  label: "Carré 1K",      subLabel: "1024×1024",        ratio: 1 },
+    { value: "2048x2048",  label: "Carré 2K",      subLabel: "2048×2048",        ratio: 1 },
+    { value: "4096x4096",  label: "Carré 4K",      subLabel: "4096×4096",        ratio: 1 },
+    { value: "1560x2000",  label: "Packshot 4:5",  subLabel: "1560×2000",        ratio: 1560 / 2000 },
+    { value: "2048x1152",  label: "Bannière 16:9", subLabel: "2048×1152",        ratio: 2048 / 1152 },
+    { value: "1152x2048",  label: "Story 9:16",    subLabel: "1152×2048",        ratio: 1152 / 2048 },
 ];
 
 function parseGenRatio(r) {
@@ -162,16 +167,21 @@ export function ExportPanel({ pipeline, generatedImages, loading, filledCount, s
 
             {/* Optional resize */}
             <div className="space-y-2">
-                <div className="flex items-center gap-4">
-                    <label className="text-sm font-medium min-w-fit">Redimensionner</label>
+                <div className="flex items-start gap-4">
+                    <label className="text-sm font-medium min-w-fit pt-2">Redimensionner</label>
                     <div className="flex gap-2 flex-1 flex-wrap">
-                        {EXPORT_SIZES.map(({ value, label }) => (
+                        {EXPORT_SIZES.map(({ value, label, subLabel }) => (
                             <button
                                 key={value || "native"}
                                 onClick={() => setExportSize(value)}
-                                className={`py-1.5 px-3 rounded-md text-sm font-medium border transition-all ${exportSize === value ? "bg-primary text-primary-foreground border-primary" : "hover:bg-accent border-input"}`}
+                                className={`py-1.5 px-3 rounded-md text-sm font-medium border transition-all flex flex-col items-center leading-tight ${exportSize === value ? "bg-primary text-primary-foreground border-primary" : "hover:bg-accent border-input"}`}
                             >
-                                {label}
+                                <span>{label}</span>
+                                {subLabel && (
+                                    <span className={`text-[10px] font-normal mt-0.5 ${exportSize === value ? "opacity-80" : "text-muted-foreground"}`}>
+                                        {subLabel}
+                                    </span>
+                                )}
                             </button>
                         ))}
                     </div>
@@ -183,15 +193,33 @@ export function ExportPanel({ pipeline, generatedImages, loading, filledCount, s
                         selected && selected.ratio && genRatio &&
                         Math.abs(selected.ratio - genRatio) > 0.05;
                     if (!mismatch) return null;
+
+                    // Suggest a compatible export size if one exists for the
+                    // current generation ratio. Names match the GENERATION_PRESETS
+                    // for instant mental matching.
+                    const compatibleSize = EXPORT_SIZES.find(
+                        (s) => s.ratio && Math.abs(s.ratio - genRatio) <= 0.05,
+                    );
                     return (
                         <div className="flex gap-2 text-xs bg-amber-50 border border-amber-200 text-amber-800 rounded-md p-2.5 leading-snug">
                             <span aria-hidden>⚠️</span>
                             <span>
                                 Cette taille a un ratio différent de votre génération
                                 ({generationAspectRatio}) — l'image sera <strong>rognée sur les
-                                bords</strong>. Pour exporter sans perte, choisissez une taille
-                                compatible (ex : 2048×1152 pour 16:9, 2048×2048 pour 1:1) ou
-                                regénérez avec le ratio correspondant.
+                                bords</strong>.{" "}
+                                {compatibleSize ? (
+                                    <>
+                                        Pour exporter sans perte, choisissez{" "}
+                                        <strong>{compatibleSize.label}</strong> ({compatibleSize.subLabel}),
+                                        ou regénérez avec le préset correspondant à la taille souhaitée
+                                        (boutons en haut de la section Génération).
+                                    </>
+                                ) : (
+                                    <>
+                                        Pour exporter sans perte, regénérez avec le préset correspondant
+                                        à la taille souhaitée (boutons en haut de la section Génération).
+                                    </>
+                                )}
                             </span>
                         </div>
                     );
