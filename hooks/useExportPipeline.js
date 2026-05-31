@@ -210,10 +210,21 @@ export function useExportPipeline({ generatedImages, imageDims, resolution, aspe
         return images;
     };
 
-    // Build descriptive filename
+    // Build descriptive filename. The dimensions in the filename reflect the
+    // ACTUAL bytes on disk — if the user picked an export size, sharp resizes
+    // the image to that, so the filename must say the export size, not the
+    // original generation dimensions.
     const getFileName = (idx, ext = "png") => {
-        const dims = imageDims[idx];
-        const dimStr = dims ? `${dims.w}x${dims.h}` : resolution;
+        let dimStr;
+        if (exportSize && exportSize.includes("x")) {
+            // User picked an explicit export size → that's the final byte
+            // dimensions (sharp resizes via /api/export with fit: cover).
+            dimStr = exportSize;
+        } else {
+            // "Natif" / no resize → image keeps its generated dimensions.
+            const dims = imageDims[idx];
+            dimStr = dims ? `${dims.w}x${dims.h}` : resolution;
+        }
         const bgStr = bgMode === "white" ? "_white_background" : bgMode === "transparent" ? "_transparent" : "";
         return `packshot_${idx + 1}_${dimStr}${bgStr}.${ext}`;
     };
